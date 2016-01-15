@@ -267,8 +267,7 @@ class EventFinder:
 		if target_type == 'transcripts':
 		    if self.transcripts_dict.has_key(align.target):
 			genes.add(self.transcripts_dict[align.target].gene)
-			#print 'bbb', align.target, self.transcripts_dict[align.target].gene
-		
+
 		adjs = self.find_indels(align, query_fasta, target_fasta, target_type, 
 		                        min_size=min_indel_size, no_indels=no_indels)
 		for adj in adjs:
@@ -402,7 +401,7 @@ class EventFinder:
 			    bad = True
 			
 		elif 'repeat' not in event_type:
-		    if not aln.is_unmapped and aln.cigartuples[0][0] == 0 and aln.cigartuples[-1][0] == 0:
+		    if event_type in ('fusion', 'read_through') and not aln.is_unmapped and aln.cigartuples[0][0] == 0 and aln.cigartuples[-1][0] == 0:
 			failed_reason = 'probe align from end to end %s' % aln.cigarstring
 			bad = True
 			
@@ -693,13 +692,16 @@ class EventFinder:
 	if adj.rearrangement == 'dup' and\
 	   adj.transcripts and adj.exons is not None and\
 	   adj.exons[0] is not None and adj.exons[1] is not None:
-	    if adj.transcripts[0].gene == adj.transcripts[1].gene:
+	    if adj.transcripts[0].gene == adj.transcripts[1].gene and\
+	       adj.transcripts[0].is_coding() and\
+	       not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
+	       not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
 		if adj.exons[0] == adj.exons[1]:
 		    adj.event = 'ITD'
 		else:
 		    adj.event = 'PTD'
-	    else:
-		adj.event = 'fusion'
+	    #else:
+		#adj.event = adj.rearrangement
 			    
 	if (adj.event == 'None' or adj.event is None) and adj.rearrangement is not None:
 	    adj.event = adj.rearrangement
@@ -1147,6 +1149,10 @@ class EventFinder:
 		                )
 		
 		if event_type == 'ins':
+		    ins_seq = query_fasta.fetch(align.query, query_breaks[0], query_breaks[1] - 1)
+		    if align.strand == '-':
+			ins_seq = reverse_complement(novel_seq)
+		    adj.ins_seq = ins_seq
 		    if not self.is_repeat_number_change(adj,
 		                                        query_fasta, 
 		                                        target_fasta,
@@ -1174,6 +1180,8 @@ class EventFinder:
 	target_name = '%s:%s-%s' % (adj.targets[0], adj.target_breaks[0], adj.target_breaks[1])
 	
 	novel_seq = query_seq[adj.seq_breaks[0] : adj.seq_breaks[1] - 1]
+	if self.is_homopolymer(novel_seq):
+	    return
 	if strand == '-':
 	    novel_seq = reverse_complement(novel_seq)
 	    	
@@ -1360,7 +1368,7 @@ class EventFinder:
 		                        add = True)
 		#print 'yyo', old_seq, new_seq, old_seq.lower() == new_seq.lower()
 		if old_seq.lower() == new_seq.lower():
-		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_start), copy_num_ref)
+		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_start + 1), copy_num_ref)
 
 	    elif adj.event == 'repeat_reduction':
 		old_seq = construct_seq(adj.chroms[0],
@@ -1404,16 +1412,16 @@ class EventFinder:
 	    return map(''.join, zip(*[iter(seq)] * size))
 
 	def find_repeat(seq):
-	    repeat = seq
 	    if len(seq) % 3 == 0:
 		uniq_subseqs = Set(chop_seq(seq, 3))
 		if len(uniq_subseqs) == 1:
-		    repeat = list(uniq_subseqs)[0]
-	    if repeat is not None and len(seq) % 2 == 0:
-		uniq_subseqs = Set(chop_seq(seq, 3))
+		    return list(uniq_subseqs)[0]
+
+	    if len(seq) % 2 == 0:
+		uniq_subseqs = Set(chop_seq(seq, 2))
 		if len(uniq_subseqs) == 1:
-		    repeat = list(uniq_subseqs)[0]
-	    return repeat
+		    return list(uniq_subseqs)[0]
+	    return None
 	
 	def get_copy_num(target, start_pos, repeat, direction):
 	    pos = start_pos
@@ -1459,36 +1467,36 @@ class EventFinder:
 	
 	if len(changed_seq) <= max_size and (len(changed_seq) % 2 == 0 or len(changed_seq) % 3 == 0) and not self.is_homopolymer(changed_seq):
 	    repeat = find_repeat(changed_seq)
-	    changed_copy_num = len(changed_seq) / len(repeat)
-		
-	    target_breaks_sorted = sorted(adj.target_breaks)
-	    copy_num_upstream = get_copy_num(adj.targets[0], target_breaks_sorted[0], repeat, '-')
-	    copy_num_downstream = get_copy_num(adj.targets[0], target_breaks_sorted[1], repeat, '+')
-	    		
-	    if copy_num_upstream > 0 or copy_num_downstream > 0:
-		original_copy_num = copy_num_upstream +  copy_num_downstream + changed_copy_num
-		if adj.rearrangement == 'ins':
-		    adj.event = 'repeat_expansion'
-		    adj.copy_num_change = (original_copy_num, original_copy_num + changed_copy_num)
-		elif adj.rearrangement == 'del':
-		    adj.event = 'repeat_reduction'
-		    adj.copy_num_change = (original_copy_num, original_copy_num - changed_copy_num)
-		adj.repeat_seq = repeat.upper()
-		
-		expansion_downstream = len(repeat) * copy_num_downstream
-		expansion_upstream = len(repeat) * copy_num_upstream
-		seq_breaks_sorted = sorted(adj.seq_breaks)
-		#print 'yy0', expansion_upstream, expansion_downstream, repeat, changed_copy_num, changed_seq
-		#print 'yy1', adj.seq_breaks[0] - expansion_upstream, adj.seq_breaks[1] + expansion_downstream
-		if strand == '+':
-		    adj.support_span = (max(1, seq_breaks_sorted[0] - expansion_upstream),
-		                        min(query_fasta.fetch(adj.seq_id), seq_breaks_sorted[1] + expansion_downstream))
-		else:
-		    adj.support_span = (max(1, seq_breaks_sorted[0] - expansion_downstream),
-		                        min(query_fasta.fetch(adj.seq_id), seq_breaks_sorted[1] + expansion_upstream))
-		
-		return True
-	    
+	    if repeat is not None:
+		changed_copy_num = len(changed_seq) / len(repeat)
+		target_breaks_sorted = sorted(adj.target_breaks)
+		copy_num_upstream = get_copy_num(adj.targets[0], target_breaks_sorted[0], repeat, '-')
+		copy_num_downstream = get_copy_num(adj.targets[0], target_breaks_sorted[1], repeat, '+')
+
+		if copy_num_upstream > 0 or copy_num_downstream > 0:
+		    original_copy_num = copy_num_upstream +  copy_num_downstream + changed_copy_num
+		    if adj.rearrangement == 'ins':
+			adj.event = 'repeat_expansion'
+			adj.copy_num_change = (original_copy_num, original_copy_num + changed_copy_num)
+		    elif adj.rearrangement == 'del':
+			adj.event = 'repeat_reduction'
+			adj.copy_num_change = (original_copy_num, original_copy_num - changed_copy_num)
+		    adj.repeat_seq = repeat.upper()
+
+		    expansion_downstream = len(repeat) * copy_num_downstream
+		    expansion_upstream = len(repeat) * copy_num_upstream
+		    seq_breaks_sorted = sorted(adj.seq_breaks)
+		    #print 'yy0', expansion_upstream, expansion_downstream, repeat, changed_copy_num, changed_seq
+		    #print 'yy1', adj.seq_breaks[0] - expansion_upstream, adj.seq_breaks[1] + expansion_downstream
+		    if strand == '+':
+			adj.support_span = (max(1, seq_breaks_sorted[0] - expansion_upstream),
+			                    min(query_fasta.fetch(adj.seq_id), seq_breaks_sorted[1] + expansion_downstream))
+		    else:
+			adj.support_span = (max(1, seq_breaks_sorted[0] - expansion_downstream),
+			                    min(query_fasta.fetch(adj.seq_id), seq_breaks_sorted[1] + expansion_upstream))
+
+		    return True
+
 	return False
     
     def is_fusion(self, adj, align_strands, target_type):
@@ -1632,7 +1640,6 @@ class EventFinder:
 	    if self.transcripts_dict.has_key(tid):
 		genes.add(self.transcripts_dict[tid].gene)
 		
-	#print 'bbbb', genes
 	if len(genes) < 2:
 	    return None
 
@@ -1752,103 +1759,3 @@ class EventFinder:
 		    adj.in_frame = True
 		else:
 		    adj.in_frame = in_frame
-	    
-    
-    #def is_read_through_from_single_align(self, align):
-	#block_matches = self.exon_mapper.map_align(align)
-	#genes = Set()
-	#for tid in block_matches.keys():
-	    #if self.transcripts_dict.has_key(tid):
-		#genes.add(self.transcripts_dict[tid].gene)
-	##print genes
-		
-	#if len(genes) != 2:
-	    #return None
-
-	#upstream_matches = {}
-	#downstream_matches = {}
-	#for tid, matches in block_matches.iteritems():
-	    #for i in range(len(matches) - 1):
-		#if matches[i] is None and\
-		   #matches[i + 1] is not None and\
-		   #matches[i + 1][0][1][0] == '=':
-		    #if not downstream_matches.has_key(i + 1):
-			#downstream_matches[i + 1] = []
-		    #downstream_matches[i + 1].append((tid, matches[i + 1][0][0], len([m for m in matches if m is not None])))
-		#elif matches[i + 1] is None and\
-		     #matches[i] is not None and \
-		     #matches[i][-1][1][1] == '=':
-		    #if not upstream_matches.has_key(i):
-			#upstream_matches[i] = []
-		    #upstream_matches[i].append((tid, matches[i][-1][0], len([m for m in matches if m is not None])))
-	##print 'up', upstream_matches
-	##print 'down', downstream_matches
-		    
-	#if len(upstream_matches.keys()) == 1 and len(downstream_matches.keys()) == 1:
-	    #upstream_block_idx = upstream_matches.keys()[0]
-	    #downstream_block_idx = downstream_matches.keys()[0]
-	    #print upstream_block_idx, downstream_block_idx
-	    
-	    #if downstream_block_idx == upstream_block_idx + 1:
-		#upstream_matches_sorted = sorted(upstream_matches[upstream_block_idx], key = itemgetter(2), reverse=True)
-		#downstream_matches_sorted = sorted(downstream_matches[downstream_block_idx], key = itemgetter(2), reverse=True)
-		#print upstream_matches_sorted
-		#print downstream_matches_sorted
-		#upstream_transcript = self.transcripts_dict[upstream_matches_sorted[0][0]]
-		#downstream_transcript = self.transcripts_dict[downstream_matches_sorted[0][0]]
-		#upstream_exon = upstream_transcript.exon_num(upstream_matches_sorted[0][1])
-		#downstream_exon = downstream_transcript.exon_num(downstream_matches_sorted[0][1])
-		#seq_breaks = [align.query_blocks[upstream_block_idx][1], align.query_blocks[downstream_block_idx][0]]
-		#target_breaks = [align.blocks[upstream_block_idx][1], align.blocks[downstream_block_idx][0]]
-		#transcripts = [upstream_transcript, downstream_transcript]
-		#exons = [upstream_exon, downstream_exon]
-		
-		#if align.strand == '-':
-		    #seq_breaks.reverse()
-		    #target_breaks.reverse()
-		    #transcripts.reverse()
-		    #exons.reverse()
-		
-		#adj = Adjacency(align.query,
-		                #(align.target, align.target),
-		                #seq_breaks,
-		                #target_breaks,
-		                #event = 'read_through',
-		                #transcripts = transcripts,
-		                #exons = exons,
-		                #exon_bounds = (True, True),
-		                #)
-		#self.is_sense_fusion(adj, (align.strand, align.strand), 'genome')
-		#return adj
-	#return None
-    
-    #@classmethod
-    #def check_frame(self, adj, query_seq):
-	#if adj.transcripts[0].is_coding() and adj.transcripts[1].is_coding() and\
-	   #(adj.feature is not None and adj.feature != 'na' and not 'UTR' in adj.feature):
-	    #if adj.event in ('ins', 'del'):
-		#if adj.size % 3 == 0:
-		    #in_frame = True
-		#else:
-		    #in_frame = False
-	    #elif adj.event in ('fusion', 'read_through') and adj.upstream_transcript and adj.downstream_transcript:
-		#in_frame = is_inframe(adj.upstream_transcript,
-		                      #adj.downstream_transcript,
-		                      #sorted(adj.seq_breaks),
-		                      #query_seq,
-		                      #self.genome_fasta)
-		##print 'ww3', adj.upstream_transcript.gene, adj.downstream_transcript.gene, sorted(adj.seq_breaks), adj.seq_breaks
-		##print 'www', in_frame
-	    #else:
-		#in_frame = is_inframe(adj.transcripts[0],
-		                      #adj.transcripts[1],
-		                      #sorted(adj.seq_breaks),
-		                      #query_seq,
-		                      #self.genome_fasta)
-
-	    #if self.debug:
-		#print 'frame: %s %s' % (adj.seq_id, in_frame)
-	    #if in_frame:
-		#adj.in_frame = True
-	    #else:
-		#adj.in_frame = in_frame
