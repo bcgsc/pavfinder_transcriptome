@@ -6,7 +6,7 @@ import collections
 from shared.alignment import Alignment, reverse_complement, search_by_regex, search_by_align
 from shared.chimera import find_chimera
 from shared.adjacency import Adjacency
-from shared.translate import check_frame
+from shared.translate import check_frame, nuc_to_aa
 from exon_mapper import ExonMapper
 from itertools import groupby
 import subprocess
@@ -267,7 +267,7 @@ class EventFinder:
 		if target_type == 'transcripts':
 		    if self.transcripts_dict.has_key(align.target):
 			genes.add(self.transcripts_dict[align.target].gene)
-			print 'bbb', align.target, self.transcripts_dict[align.target].gene
+			#print 'bbb', align.target, self.transcripts_dict[align.target].gene
 		
 		adjs = self.find_indels(align, query_fasta, target_fasta, target_type, 
 		                        min_size=min_indel_size, no_indels=no_indels)
@@ -278,7 +278,12 @@ class EventFinder:
 		    
 		    if filter_adj(adj):
 			events.append(adj)
-			print 'final2', adj.details()
+
+		    if adj.event in ('repeat_expansion', 'repeat_reduction'):
+			if len(adj.repeat_seq) == 3 and\
+			   not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
+			   not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
+			    self.adjust_for_amino_acid_repeat(adj)
 			
 	    if events:
 		events_by_query[query] = events  
@@ -1099,6 +1104,8 @@ class EventFinder:
 		
 	adjs = []
 		
+	print 'tttblocks', align.blocks
+	print 'tttqblocks', align.query_blocks
 	if re.search('[ID]\d+', align.cigarstring):
 	    for i, j in extract_flanking_blocks():		
 		target_breaks = (align.blocks[i][1], align.blocks[j][0])
@@ -1213,6 +1220,184 @@ class EventFinder:
 	    else:
 		print 'gap between dup %s %s' % (adj.seq_id, novel_seq)
 
+    def adjust_for_amino_acid_repeat(self, adj):
+	def get_aa_repeat(aa, nt, start=False, end=False):
+	    repeat = None
+	    same = True
+	    if start:
+		repeat = aa[0]
+		repeat_nt = nt[:3]
+		i = 1
+		j = 3
+		while same and i < len(aa):
+		    #print 'tttccc', i, aa[i], repeat, repeat_nt, nt[j:j+3]
+		    if aa[i] == repeat[0] and nt[j:j+3] == repeat_nt[:3]:
+			repeat += aa[i]
+			same = True
+		    else:
+			same = False
+		    i += 1
+		    j += 3
+	    elif end:
+		repeat = aa[-1]
+		repeat_nt = nt[-3:]
+		i = len(aa) - 2
+		j = len(nt) - 6
+		while same and i >= 0:
+		    #print 'tttbbb', i, aa[i], repeat, repeat_nt, nt[j:j+3]
+		    if aa[i] == repeat[0] and nt[j:j+3] == repeat_nt[:3]:
+			repeat += aa[i]
+			same = True
+		    else:
+			same = False
+		    i -= 1
+		    j -= 3
+	    return repeat, repeat_nt.lower()
+
+	def update_adj(genome_breaks, repeat_seq, copy_num_change):
+	    adj.genome_breaks = genome_breaks
+	    adj.repeat_seq = repeat_seq.upper()
+	    adj.copy_num_change = copy_num_change
+
+	def construct_seq(chrom, span, break_start, break_end=None, repeat_size=3, add=False, minus=False, repeat_seq=None, flank=5):
+	    """start = begining coord of repeat, end = end coord"""
+	    if add and repeat_seq is not None:
+		return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start).lower() +\
+		       repeat_seq.upper() +\
+		       self.genome_fasta.fetch(chrom, break_start, span[1] + flank).lower()
+	    elif minus and break_end is not None:
+		return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start - 1).upper() +\
+		       self.genome_fasta.fetch(chrom, break_end, span[1] + flank).lower()
+
+	def identify_aa_repeat():
+	    # convert genome_breaks to amino acid coordinates
+	    cds_coords = sorted([adj.transcripts[0].genome_coord_to_txt_coord(adj.genome_breaks[0] + 1, cds=True),
+	                         adj.transcripts[0].genome_coord_to_txt_coord(adj.genome_breaks[1] - 1, cds=True)])
+	    aa_coords = (adj.transcripts[0].txt_coord_to_aa_coord(cds_coords[0]),
+	                 adj.transcripts[0].txt_coord_to_aa_coord(cds_coords[1]))
+
+	    aa = adj.transcripts[0].translate(self.genome_fasta)
+	    cdna = adj.transcripts[0].get_sequence(self.genome_fasta, cds_only=True)
+
+	    #print 'cds', cds_coords, aa_coords
+	    cds_coords_converted = (adj.transcripts[0].aa_coord_to_txt_coord(aa_coords[0] - 1),
+	                            adj.transcripts[0].aa_coord_to_txt_coord(aa_coords[1]))
+	    #print 'cds2', cds_coords_converted
+	    #print 'down', aa[aa_coords[1] - 1:], cdna[cds_coords[1] - 1 : cds_coords[1] + 2], cdna[cds_coords[1] - 1:cds_coords[1] - 1+100]
+	    #print 'up', aa[:aa_coords[0] - 1], cdna[cds_coords[0] - 3 : cds_coords[0]], cdna[cds_coords[0]-100:cds_coords[0]]	    
+	    #print 'down2', cdna[cds_coords_converted[1][0]-1:cds_coords_converted[1][0]+100]
+	    #print 'up2', cdna[cds_coords_converted[0][1]-100:cds_coords_converted[0][1]]
+
+	    # check if there is amino acid repeat up or downstream of breakpoint
+	    repeat_down, repeat_down_nt = get_aa_repeat(aa[aa_coords[1] - 1:], cdna[cds_coords_converted[1][0]-1:], start=True)
+	    repeat_up, repeat_up_nt = get_aa_repeat(aa[:aa_coords[0] - 1], cdna[:cds_coords_converted[0][1]], end=True)
+
+	    # identify amino acid repeat start and end
+	    repeat_start = None
+	    repeat_end = None
+	    if len(repeat_down) > 1 or len(repeat_up) > 1:
+		shift_result = None
+		if len(repeat_down) > 1 and len(repeat_up) > 1:
+		    if repeat_down[0] == repeat_up[0] and repeat_down_nt[:3] == repeat_up_nt[:3]:
+			repeat_end = aa_coords[1] + (len(repeat_down) - 1)
+			repeat_start = aa_coords[0] - 1 - (len(repeat_up) - 1)
+		    else:
+			repeat_end = aa_coords[1] + (len(repeat_down) - 1)
+			repeat_start = aa_coords[1]
+			shift_result = shift_coord(repeat_start, repeat_end)
+			if shift_result is None:
+			    repeat_start = aa_coords[0] - 1 - (len(repeat_up) - 1)
+			    repeat_end = aa_coords[0]
+
+		elif len(repeat_down) > 1:
+		    repeat_end = aa_coords[1] + (len(repeat_down) - 1)
+		    repeat_start = aa_coords[1]
+
+		else:
+		    repeat_start = aa_coords[0] - 1 - (len(repeat_up) - 1)
+		    repeat_end = aa_coords[0] - 1
+
+	    #print 'kk', repeat_start, repeat_end, repeat_down, repeat_up, repeat_down_nt, repeat_up_nt
+	    return repeat_start, repeat_end
+
+	def shift_coord(repeat_start, repeat_end):
+	    #print 'eee', cdna
+	    #print 'fff1', aa[repeat_start - 1], aa[repeat_start - 4:repeat_start + 3], repeat_start
+	    #print 'fff2', aa[repeat_end - 1], aa[repeat_end - 4:repeat_end + 3], repeat_end
+	    repeat_track_genome = (adj.transcripts[0].aa_coord_to_genome_coord(repeat_start),
+	                           adj.transcripts[0].aa_coord_to_genome_coord(repeat_end))
+	    repeat_track_sorted = sorted([repeat_track_genome[0][0],
+	                                  repeat_track_genome[0][1],
+	                                  repeat_track_genome[1][0],
+	                                  repeat_track_genome[1][1]])
+	    repeat_start, repeat_end = repeat_track_sorted[0], repeat_track_sorted[-1]
+	    print 'tttabc', repeat_track_sorted, repeat_start, repeat_end, repeat_track_genome
+	    repeat_start_genome_sorted = sorted(repeat_track_genome[0])
+	    repeat_seq = self.genome_fasta.fetch(adj.chroms[0],
+	                                         repeat_start_genome_sorted[0] - 1,
+	                                         repeat_start_genome_sorted[1])
+	    #repeat_seq = self.genome_fasta.fetch(adj.chroms[0],
+	                                         #repeat_track_genome[0][0] - 1,
+	                                         #repeat_track_genome[0][1])
+	    copy_num_ref = (repeat_end - repeat_start + 1) / len(repeat_seq)
+	    #print 'yyk', repeat_start, repeat_end, repeat_seq, copy_num_ref
+	    if adj.event == 'repeat_expansion':
+		old_seq = construct_seq(adj.chroms[0],
+		                        (repeat_start, repeat_end),
+		                        break_start = adj.genome_breaks[0],
+		                        repeat_seq = adj.repeat_seq,
+		                        add = True)
+		if adj.transcripts[0].strand == '+':
+		    break_start = repeat_end
+		else:
+		    break_start = repeat_start - 1
+		new_seq = construct_seq(adj.chroms[0],
+		                        (repeat_start, repeat_end),
+		                        #break_start = repeat_start - 1,
+		                        #break_start = repeat_end,
+		                        break_start = break_start,
+		                        repeat_seq = repeat_seq,
+		                        add = True)
+		#print 'yyo', old_seq, new_seq, old_seq.lower() == new_seq.lower()
+		if old_seq.lower() == new_seq.lower():
+		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_start), copy_num_ref)
+
+	    elif adj.event == 'repeat_reduction':
+		old_seq = construct_seq(adj.chroms[0],
+	                                (repeat_start, repeat_end),
+	                                break_start = adj.genome_breaks[0] + 1,
+	                                break_end = adj.genome_breaks[1] - 1,
+	                                minus = True)
+		if adj.transcripts[0].strand == '+':
+		    break_start = repeat_end - len(repeat_seq) + 1
+		    break_end = repeat_end
+		else:
+		    break_start = repeat_start
+		    break_end = repeat_start + len(repeat_seq) - 1
+		new_seq = construct_seq(adj.chroms[0],
+	                                (repeat_start, repeat_end),
+	                                #break_start = repeat_start,
+	                                #break_end = repeat_start + len(repeat_seq) - 1,
+		                        break_start = break_start,
+		                        break_end = break_end,
+	                                minus = True)
+		#print 'old', adj.genome_breaks[0] + 1, adj.genome_breaks[1] - 1, old_seq
+		#print 'new', repeat_start, repeat_start + len(repeat_seq) - 1, new_seq, old_seq.lower() == new_seq.lower()
+		if old_seq.lower() == new_seq.lower():
+		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_end), copy_num_ref)
+	    return None
+
+	aa_repeat_span = identify_aa_repeat()
+	#print 'dd', aa_repeat_span
+	if aa_repeat_span[0] is not None and aa_repeat_span[1] is not None:
+	    shift_result = shift_coord(aa_repeat_span[0], aa_repeat_span[1])
+	    if shift_result is not None:
+		repeat_start, repeat_end, repeat_seq, breaks, copy_num_ref = shift_result
+		if adj.event == 'repeat_expansion':
+		    update_adj(breaks, repeat_seq, (copy_num_ref, copy_num_ref + 1))
+		elif adj.event == 'repeat_reduction':
+		    update_adj((breaks[0] - 1, breaks[1] + 1), repeat_seq, (copy_num_ref, copy_num_ref - 1))
+
     def is_repeat_number_change(self, adj, query_fasta, target_fasta, strand, max_size=30):
 	def chop_seq(seq, size):
 	    """chop seq into equal size sub-strings"""
@@ -1272,7 +1457,7 @@ class EventFinder:
 	    # don't need to reverse-complement because target sequence is used
 	    changed_seq = target_fasta.fetch(adj.targets[0], target_breaks_sorted[0], target_breaks_sorted[1] - 1)	    
 	
-	if len(changed_seq) <= max_size and (len(changed_seq) % 2 == 0 or len(changed_seq) % 3 == 0):
+	if len(changed_seq) <= max_size and (len(changed_seq) % 2 == 0 or len(changed_seq) % 3 == 0) and not self.is_homopolymer(changed_seq):
 	    repeat = find_repeat(changed_seq)
 	    changed_copy_num = len(changed_seq) / len(repeat)
 		
@@ -1447,7 +1632,7 @@ class EventFinder:
 	    if self.transcripts_dict.has_key(tid):
 		genes.add(self.transcripts_dict[tid].gene)
 		
-	print 'bbbb', genes
+	#print 'bbbb', genes
 	if len(genes) < 2:
 	    return None
 
