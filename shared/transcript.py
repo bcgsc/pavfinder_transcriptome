@@ -1,6 +1,8 @@
 from pybedtools import BedTool
 from sets import Set
 from alignment import reverse_complement
+from translate import get_orfs
+from math import ceil
 
 class Transcript:
     def __init__(self, id, gene=None, strand=None, coding=False, chrom=None):
@@ -65,6 +67,54 @@ class Transcript:
 	else:
 	    return len(self.exons) - index
 	
+    def translate(self, fasta):
+	if self.is_coding():
+	    cdna = self.get_sequence(fasta, cds_only=True)
+	    orfs = get_orfs(cdna, frames=[0], only_strand='+')
+	    if orfs:
+		return orfs[0][-1]
+
+	return None
+
+    def txt_coord_to_aa_coord(self, txt_coord):
+	return int(ceil(float(txt_coord) / 3))
+
+    def aa_coord_to_genome_coord(self, aa_coord, cdna_seq=None):
+	if self.is_coding() and self.cds_start is not None and self.cds_end is not None:
+	    cds_coords = (aa_coord - 1) * 3 + 1, (aa_coord - 1) * 3 + 3
+	    utr5 = 0
+	    if self.strand == '+':
+		for i in range(len(self.exons)):
+		    exon = self.exons[i]
+		    if exon[1] < self.cds_start:
+			utr5 += self.get_exon_size(i)
+		    elif self.cds_start >= exon[0] and self.cds_start <= exon[1]:
+			utr5 += self.cds_start - exon[0]
+			break
+	    else:
+		for i in range(len(self.exons))[::-1]:
+		    exon = self.exons[i]
+		    if self.cds_start < exon[0]:
+			utr5 += self.get_exon_size(i)
+		    elif self.cds_start >= exon[0] and self.cds_start <= exon[1]:
+			utr5 += exon[1] - self.cds_start
+			break
+	    print 'ggg', aa_coord, cds_coords, utr5
+	    txt_coords = utr5 + cds_coords[0], utr5 + cds_coords[1]
+	    print 'gggtxt_coords', txt_coords
+	    #print 'gggc', cdna_seq[txt_coords[0]-1:txt_coords[1]+3]
+	    #print 'gggc', cdna_seq[txt_coords[0]-4:txt_coords[1]+3]
+	    print 'ggg2', txt_coords[0], self.txt_coord_to_genome_coord(txt_coords[0])
+	    return self.txt_coord_to_genome_coord(txt_coords[0]),\
+	           self.txt_coord_to_genome_coord(txt_coords[1])
+	return None
+
+    def aa_coord_to_txt_coord(self, aa_coord, cds=True):
+	if self.is_coding():
+	    if cds:
+		return (aa_coord - 1) * 3 + 1, (aa_coord - 1) * 3 + 3
+	return None
+
     def get_sequence(self, fasta, cds_only=False, genomic=False):
 	"""Extract transcript sequence using CDS coordinate info
 
@@ -172,24 +222,48 @@ class Transcript:
 		    return self.exons[indexes[i]][1] - (coord - exon_start)
 	return None
     
-    def genome_coord_to_txt_coord(self, coord):
+    def genome_coord_to_txt_coord(self, coord, cds=False):
 	"""Given genome coordinate, returns corresponding transcript coordinate"""
-	for i in range(len(self.exons)):
-	    if coord >= self.exons[i][0] and coord <= self.exons[i][1]:
-		if self.strand == '+':
-		    offset = coord - self.exons[i][0] + 1
-		    tcoord = 0
-		    for j in range(i):
-			tcoord += self.get_exon_size(j)
-		else:
-		    offset = self.exons[i][1] - coord + 1
-		    tcoord = 0
-		    for j in range(i + 1, len(self.exons)):
-			tcoord += self.get_exon_size(j)
+	def get_exon_size(exons, index):
+	    return exons[index][1] - exons[index][0] + 1
 
-		return tcoord + offset
+	exons = self.exons
+	if cds:
+	    exons = self.get_cds()
+	if exons:
+	    for i in range(len(exons)):
+		if coord >= exons[i][0] and coord <= exons[i][1]:
+		    if self.strand == '+':
+			offset = coord - exons[i][0] + 1
+			tcoord = 0
+			for j in range(i):
+			    tcoord += get_exon_size(exons, j)
+		    else:
+			offset = exons[i][1] - coord + 1
+			tcoord = 0
+			for j in range(i + 1, len(exons)):
+			    tcoord += get_exon_size(exons, j)
+
+		    return tcoord + offset
 	return None
     
+    def get_cds(self):
+	cds = []
+	if self.is_coding() and self.cds_start is not None and self.cds_end is not None:
+	    cds_start, cds_end = sorted([int(self.cds_start), int(self.cds_end)])
+
+	    for exon in self.exons:
+		if cds_start > exon[1]:
+		    continue
+		elif (cds_start >= exon[0] and cds_start <= exon[1]) or\
+		     (cds_end >= exon[0] and cds_end <= exon[1]):
+		    cds.append([max(cds_start, exon[0]), min(cds_end, exon[1])])
+		elif cds_end < exon[0]:
+		    break
+		else:
+		    cds.append(exon)
+	return cds
+
     def at_exon_bound(self, genome_coord=None, txt_coord=None, exon_num=None, return_edge=False):
 	# coord = genomic
 	coord = None

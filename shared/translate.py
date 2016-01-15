@@ -174,3 +174,9 @@ def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
                 return (aa5, aa3, novel_aa)
                 
     return False
+
+def nuc_to_aa(nuc):
+    if len(nuc) == 3:
+	seq = Seq(nuc)
+	return seq[0:].translate()
+    return None
