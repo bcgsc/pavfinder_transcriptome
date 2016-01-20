@@ -153,8 +153,6 @@ def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
             
             up_orf_test = up_orf[-1 * min(max_aa_len_test, len(up_orf)):]
             down_orf_test = down_orf[:min(max_aa_len_test, len(down_orf))]
-            #up_orf_test = up_orf[-1 * len(up_orf):]
-            #down_orf_test = down_orf[:len(down_orf)]
             
             #print 'up_orf', up_orf, up_orf_test, up_orf_test in orf5
             #print 'down_orf', down_orf, down_orf_test, down_orf_test in orf3
