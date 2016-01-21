@@ -280,8 +280,10 @@ class EventFinder:
 
 		    if adj.event in ('repeat_expansion', 'repeat_reduction'):
 			if len(adj.repeat_seq) == 3 and\
+			   adj.transcripts and\
 			   not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
 			   not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
+			    adj.in_frame = True
 			    self.adjust_for_amino_acid_repeat(adj)
 			
 	    if events:
@@ -1151,7 +1153,7 @@ class EventFinder:
 		if event_type == 'ins':
 		    ins_seq = query_fasta.fetch(align.query, query_breaks[0], query_breaks[1] - 1)
 		    if align.strand == '-':
-			ins_seq = reverse_complement(novel_seq)
+			ins_seq = reverse_complement(ins_seq)
 		    adj.ins_seq = ins_seq
 		    if not self.is_repeat_number_change(adj,
 		                                        query_fasta, 
@@ -1232,7 +1234,10 @@ class EventFinder:
 	def get_aa_repeat(aa, nt, start=False, end=False):
 	    repeat = None
 	    same = True
-	    if start:
+	    if not aa:
+		return '', ''
+
+	    elif start:
 		repeat = aa[0]
 		repeat_nt = nt[:3]
 		i = 1
@@ -1241,6 +1246,7 @@ class EventFinder:
 		    #print 'tttccc', i, aa[i], repeat, repeat_nt, nt[j:j+3]
 		    if aa[i] == repeat[0] and nt[j:j+3] == repeat_nt[:3]:
 			repeat += aa[i]
+			repeat_nt += nt[j:j+3]
 			same = True
 		    else:
 			same = False
@@ -1255,6 +1261,7 @@ class EventFinder:
 		    #print 'tttbbb', i, aa[i], repeat, repeat_nt, nt[j:j+3]
 		    if aa[i] == repeat[0] and nt[j:j+3] == repeat_nt[:3]:
 			repeat += aa[i]
+			repeat_nt += nt[j:j+3] 
 			same = True
 		    else:
 			same = False
@@ -1278,60 +1285,68 @@ class EventFinder:
 		       self.genome_fasta.fetch(chrom, break_end, span[1] + flank).lower()
 
 	def identify_aa_repeat():
-	    # convert genome_breaks to amino acid coordinates
-	    cds_coords = sorted([adj.transcripts[0].genome_coord_to_txt_coord(adj.genome_breaks[0] + 1, cds=True),
-	                         adj.transcripts[0].genome_coord_to_txt_coord(adj.genome_breaks[1] - 1, cds=True)])
-	    aa_coords = (adj.transcripts[0].txt_coord_to_aa_coord(cds_coords[0]),
-	                 adj.transcripts[0].txt_coord_to_aa_coord(cds_coords[1]))
+	    def search_for_repeat(aa, pos):
+		for start in (start - 1, start + 3):
+		    before = aa[pos - 1]
+		    after = aa[pos]
 
 	    aa = adj.transcripts[0].translate(self.genome_fasta)
-	    cdna = adj.transcripts[0].get_sequence(self.genome_fasta, cds_only=True)
+	    cds = adj.transcripts[0].get_sequence(self.genome_fasta, cds_only=True)
 
-	    #print 'cds', cds_coords, aa_coords
-	    cds_coords_converted = (adj.transcripts[0].aa_coord_to_txt_coord(aa_coords[0] - 1),
-	                            adj.transcripts[0].aa_coord_to_txt_coord(aa_coords[1]))
-	    #print 'cds2', cds_coords_converted
-	    #print 'down', aa[aa_coords[1] - 1:], cdna[cds_coords[1] - 1 : cds_coords[1] + 2], cdna[cds_coords[1] - 1:cds_coords[1] - 1+100]
-	    #print 'up', aa[:aa_coords[0] - 1], cdna[cds_coords[0] - 3 : cds_coords[0]], cdna[cds_coords[0]-100:cds_coords[0]]	    
-	    #print 'down2', cdna[cds_coords_converted[1][0]-1:cds_coords_converted[1][0]+100]
-	    #print 'up2', cdna[cds_coords_converted[0][1]-100:cds_coords_converted[0][1]]
+	    mid_genome_break = ((adj.genome_breaks[0] + 1) + (adj.genome_breaks[1] - 1)) / 2
+	    cds_pos = adj.transcripts[0].genome_coord_to_txt_coord(mid_genome_break, cds=True)
+	    if cds_pos is not None:
+		aa_pos = adj.transcripts[0].txt_coord_to_aa_coord(cds_pos)
+		if adj.genome_breaks[1] - adj.genome_breaks[0] < 4:
+		    aa_pos -= 1
+		cds_pos_converted = adj.transcripts[0].aa_coord_to_txt_coord(aa_pos)[1]
+		    
+		#print 'ccc', mid_genome_break, cds_pos, aa_pos, cds_pos_converted
+		#print 'ccc2', aa[:aa_pos]
+		#print 'ccc2a', aa[aa_pos:], len(aa), len(aa[:aa_pos]), len(aa[aa_pos - 1:])
+		#print 'ccc3', cds[:cds_pos_converted]
+		#print 'ccc3a', cds[cds_pos_converted:], len(cds), len(cds[:cds_pos_converted]), len(cds[cds_pos_converted:])
+		repeat_down, repeat_down_nt = get_aa_repeat(aa[aa_pos:], cds[cds_pos_converted:], start=True)
+		repeat_up, repeat_up_nt = get_aa_repeat(aa[:aa_pos], cds[:cds_pos_converted], end=True)
+		#print 'ccc4', repeat_down, repeat_down_nt
+		#print 'ccc5', repeat_up, repeat_up_nt
 
-	    # check if there is amino acid repeat up or downstream of breakpoint
-	    repeat_down, repeat_down_nt = get_aa_repeat(aa[aa_coords[1] - 1:], cdna[cds_coords_converted[1][0]-1:], start=True)
-	    repeat_up, repeat_up_nt = get_aa_repeat(aa[:aa_coords[0] - 1], cdna[:cds_coords_converted[0][1]], end=True)
+		# identify amino acid repeat start and end
+		repeat_start = None
+		repeat_end = None
+		if len(repeat_down) > 1 or len(repeat_up) > 1:
+		    shift_result = None
+		    if len(repeat_down) >= 1 and len(repeat_up) >= 1:
+			if repeat_down[0] == repeat_up[0] and repeat_down_nt[:3] == repeat_up_nt[:3]:
+			    print 'efg'
+			    repeat_end = aa_pos + 1 + (len(repeat_down) - 1)
+			    repeat_start = aa_pos - (len(repeat_up) - 1)
 
-	    # identify amino acid repeat start and end
-	    repeat_start = None
-	    repeat_end = None
-	    if len(repeat_down) > 1 or len(repeat_up) > 1:
-		shift_result = None
-		if len(repeat_down) > 1 and len(repeat_up) > 1:
-		    if repeat_down[0] == repeat_up[0] and repeat_down_nt[:3] == repeat_up_nt[:3]:
-			repeat_end = aa_coords[1] + (len(repeat_down) - 1)
-			repeat_start = aa_coords[0] - 1 - (len(repeat_up) - 1)
+			elif len(repeat_down) > 1:
+			    repeat_end = aa_pos + 1 + (len(repeat_down) - 1)
+			    repeat_start = aa_pos + 1
+
+			else:
+			    repeat_start = aa_pos - (len(repeat_up) - 1)
+			    repeat_end = aa_pos
+
+		    elif len(repeat_down) > 1:
+			repeat_end = aa_pos + 1 + (len(repeat_down) - 1)
+			repeat_start = aa_pos + 1
+
 		    else:
-			repeat_end = aa_coords[1] + (len(repeat_down) - 1)
-			repeat_start = aa_coords[1]
-			shift_result = shift_coord(repeat_start, repeat_end)
-			if shift_result is None:
-			    repeat_start = aa_coords[0] - 1 - (len(repeat_up) - 1)
-			    repeat_end = aa_coords[0]
+			repeat_start = aa_pos - (len(repeat_up) - 1)
+			repeat_end = aa_pos
 
-		elif len(repeat_down) > 1:
-		    repeat_end = aa_coords[1] + (len(repeat_down) - 1)
-		    repeat_start = aa_coords[1]
+		    #print 'kk', repeat_start, repeat_end, repeat_down, repeat_up, repeat_down_nt, repeat_up_nt, len(aa)
+		    #print 'kk2', aa[repeat_start - 1:repeat_end], len(aa[repeat_start - 1:repeat_end])
+		    #print 'kk2', aa[:repeat_start],len(aa[:repeat_start])
+		    #print 'kk2', aa[repeat_end:],len(aa[repeat_end:])
+		    return repeat_start, repeat_end
 
-		else:
-		    repeat_start = aa_coords[0] - 1 - (len(repeat_up) - 1)
-		    repeat_end = aa_coords[0] - 1
-
-	    #print 'kk', repeat_start, repeat_end, repeat_down, repeat_up, repeat_down_nt, repeat_up_nt
-	    return repeat_start, repeat_end
+	    return None, None
 
 	def shift_coord(repeat_start, repeat_end):
-	    #print 'eee', cdna
-	    #print 'fff1', aa[repeat_start - 1], aa[repeat_start - 4:repeat_start + 3], repeat_start
-	    #print 'fff2', aa[repeat_end - 1], aa[repeat_end - 4:repeat_end + 3], repeat_end
 	    repeat_track_genome = (adj.transcripts[0].aa_coord_to_genome_coord(repeat_start),
 	                           adj.transcripts[0].aa_coord_to_genome_coord(repeat_end))
 	    repeat_track_sorted = sorted([repeat_track_genome[0][0],
@@ -1339,16 +1354,12 @@ class EventFinder:
 	                                  repeat_track_genome[1][0],
 	                                  repeat_track_genome[1][1]])
 	    repeat_start, repeat_end = repeat_track_sorted[0], repeat_track_sorted[-1]
-	    print 'tttabc', repeat_track_sorted, repeat_start, repeat_end, repeat_track_genome
 	    repeat_start_genome_sorted = sorted(repeat_track_genome[0])
 	    repeat_seq = self.genome_fasta.fetch(adj.chroms[0],
 	                                         repeat_start_genome_sorted[0] - 1,
 	                                         repeat_start_genome_sorted[1])
-	    #repeat_seq = self.genome_fasta.fetch(adj.chroms[0],
-	                                         #repeat_track_genome[0][0] - 1,
-	                                         #repeat_track_genome[0][1])
 	    copy_num_ref = (repeat_end - repeat_start + 1) / len(repeat_seq)
-	    #print 'yyk', repeat_start, repeat_end, repeat_seq, copy_num_ref
+	    copy_num_change = adj.size / len(repeat_seq)
 	    if adj.event == 'repeat_expansion':
 		old_seq = construct_seq(adj.chroms[0],
 		                        (repeat_start, repeat_end),
@@ -1364,11 +1375,10 @@ class EventFinder:
 		                        #break_start = repeat_start - 1,
 		                        #break_start = repeat_end,
 		                        break_start = break_start,
-		                        repeat_seq = repeat_seq,
+		                        repeat_seq = repeat_seq * copy_num_change,
 		                        add = True)
-		#print 'yyo', old_seq, new_seq, old_seq.lower() == new_seq.lower()
 		if old_seq.lower() == new_seq.lower():
-		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_start + 1), copy_num_ref)
+		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_start + 1), (copy_num_ref, copy_num_ref + copy_num_change))
 
 	    elif adj.event == 'repeat_reduction':
 		old_seq = construct_seq(adj.chroms[0],
@@ -1377,11 +1387,11 @@ class EventFinder:
 	                                break_end = adj.genome_breaks[1] - 1,
 	                                minus = True)
 		if adj.transcripts[0].strand == '+':
-		    break_start = repeat_end - len(repeat_seq) + 1
+		    break_start = repeat_end - adj.size + 1
 		    break_end = repeat_end
 		else:
 		    break_start = repeat_start
-		    break_end = repeat_start + len(repeat_seq) - 1
+		    break_end = repeat_start + adj.size - 1
 		new_seq = construct_seq(adj.chroms[0],
 	                                (repeat_start, repeat_end),
 	                                #break_start = repeat_start,
@@ -1389,22 +1399,21 @@ class EventFinder:
 		                        break_start = break_start,
 		                        break_end = break_end,
 	                                minus = True)
-		#print 'old', adj.genome_breaks[0] + 1, adj.genome_breaks[1] - 1, old_seq
+		#print 'old', adj.genome_breaks[0] + 1, adj.genome_breaks[1] - 1, repeat_start, repeat_end, old_seq
 		#print 'new', repeat_start, repeat_start + len(repeat_seq) - 1, new_seq, old_seq.lower() == new_seq.lower()
 		if old_seq.lower() == new_seq.lower():
-		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_end), copy_num_ref)
+		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_end), (copy_num_ref, copy_num_ref - copy_num_change))
 	    return None
 
 	aa_repeat_span = identify_aa_repeat()
-	#print 'dd', aa_repeat_span
 	if aa_repeat_span[0] is not None and aa_repeat_span[1] is not None:
 	    shift_result = shift_coord(aa_repeat_span[0], aa_repeat_span[1])
 	    if shift_result is not None:
-		repeat_start, repeat_end, repeat_seq, breaks, copy_num_ref = shift_result
+		repeat_start, repeat_end, repeat_seq, breaks, copy_num_change = shift_result
 		if adj.event == 'repeat_expansion':
-		    update_adj(breaks, repeat_seq, (copy_num_ref, copy_num_ref + 1))
+		    update_adj(breaks, repeat_seq, copy_num_change)
 		elif adj.event == 'repeat_reduction':
-		    update_adj((breaks[0] - 1, breaks[1] + 1), repeat_seq, (copy_num_ref, copy_num_ref - 1))
+		    update_adj((breaks[0] - 1, breaks[1] + 1), repeat_seq, copy_num_change)
 
     def is_repeat_number_change(self, adj, query_fasta, target_fasta, strand, max_size=30):
 	def chop_seq(seq, size):
@@ -1445,11 +1454,7 @@ class EventFinder:
 		    if direction == '+':
 			pos = end + 1
 		    else:
-			pos = start - 1
-		    #if direction == '+':
-			#pos += 3
-		    #else:
-			#pos -= 3
+			pos = start
 		else:
 		    matched = False
 
@@ -1474,11 +1479,18 @@ class EventFinder:
 		copy_num_downstream = get_copy_num(adj.targets[0], target_breaks_sorted[1], repeat, '+')
 
 		if copy_num_upstream > 0 or copy_num_downstream > 0:
-		    original_copy_num = copy_num_upstream +  copy_num_downstream + changed_copy_num
+		    #adj.in_frame = True
+		    original_copy_num = copy_num_upstream +  copy_num_downstream
+    
+		    # just a plain duplication or deletion
+		    if original_copy_num == 1 and changed_copy_num == 1:
+			return False
+ 
 		    if adj.rearrangement == 'ins':
 			adj.event = 'repeat_expansion'
 			adj.copy_num_change = (original_copy_num, original_copy_num + changed_copy_num)
 		    elif adj.rearrangement == 'del':
+			original_copy_num += changed_copy_num
 			adj.event = 'repeat_reduction'
 			adj.copy_num_change = (original_copy_num, original_copy_num - changed_copy_num)
 		    adj.repeat_seq = repeat.upper()
@@ -1486,8 +1498,6 @@ class EventFinder:
 		    expansion_downstream = len(repeat) * copy_num_downstream
 		    expansion_upstream = len(repeat) * copy_num_upstream
 		    seq_breaks_sorted = sorted(adj.seq_breaks)
-		    #print 'yy0', expansion_upstream, expansion_downstream, repeat, changed_copy_num, changed_seq
-		    #print 'yy1', adj.seq_breaks[0] - expansion_upstream, adj.seq_breaks[1] + expansion_downstream
 		    if strand == '+':
 			adj.support_span = (max(1, seq_breaks_sorted[0] - expansion_upstream),
 			                    min(query_fasta.fetch(adj.seq_id), seq_breaks_sorted[1] + expansion_downstream))
@@ -1513,7 +1523,6 @@ class EventFinder:
 	if (adj.event == 'fusion' or adj.event == 'read_through'):
 	    if target_type == 'genome':
 		sense = False
-		print 'bbcc', align_strands, adj.transcripts[0].strand, adj.transcripts[1].strand, adj.transcripts[0].gene, adj.transcripts[1].gene, adj.transcripts[0].id, adj.transcripts[1].id
 		if adj.transcripts[0].strand == '+' and adj.transcripts[1].strand == '+' and\
 		   align_strands[0] == align_strands[1]:
 		    sense = True
@@ -1582,22 +1591,6 @@ class EventFinder:
 	    # does not allow downstream breakpoint to be at utr when upstream isn't
 	    within_utrs = (adj.transcripts[0].within_utr(adj.genome_breaks[0]),
 	                   adj.transcripts[1].within_utr(adj.genome_breaks[1]))
-	    print 'ccdd', sense, within_utrs
-	    #if within_utrs[0] is not False and within_utrs[1] is not False:
-		#sense = False
-	    #else:
-		#if adj.upstream_transcript == adj.transcripts[0]:
-		    #if within_utrs[0] is not False:
-			#sense = False
-		    #elif within_utrs[1] is not False:
-		    ##if not within_utrs[0] and within_utrs[1]:
-			#sense = False
-		#elif adj.upstream_transcript == adj.transcripts[1]:
-		    #if within_utrs[1] is not False:
-			#sense = False
-		    #elif within_utrs[0] is not False:
-		    ##if not within_utrs[1] and within_utrs[0]:
-			#sense = False
 	    
 	adj.sense_fusion = sense
 	
@@ -1616,7 +1609,6 @@ class EventFinder:
     def is_read_through_from_single_align(self, block_matches, align):
 	def check_matches(matches, index, before=False, after=False):
 	    """checks every match before or after an index is None"""
-	    #print index, before, after
 	    if before:
 		unmatched = True
 		for i in range(0, index):
@@ -1645,15 +1637,12 @@ class EventFinder:
 
 	upstream_matches = {}
 	downstream_matches = {}
-	print 'bb', block_matches
 	for tid, matches in block_matches.iteritems():
-	    print tid, matches
 	    for i in range(len(matches) - 1):
 		if matches[i] is None and\
 		   matches[i + 1] is not None and\
 		   matches[i + 1][0][1][0] == '=' and\
 		   check_matches(matches, i, before=True):
-		    print tid, i, i+1, 'down', matches[i], matches[i+1], check_matches(matches, i, before=True)
 		        
 		    if not downstream_matches.has_key(i + 1):
 			downstream_matches[i + 1] = []
@@ -1662,17 +1651,13 @@ class EventFinder:
 		     matches[i] is not None and \
 		     matches[i][-1][1][1] == '=' and\
 		     check_matches(matches, i + 1, after=True):
-		    print tid, i, i+1, 'up', matches[i], matches[i+1], check_matches(matches, i + 1, after=True)
 		    if not upstream_matches.has_key(i):
 			upstream_matches[i] = []
 		    upstream_matches[i].append((tid, matches[i][-1][0], len([m for m in matches if m is not None])))
-	print 'up', upstream_matches
-	print 'down', downstream_matches
 		    
 	if len(upstream_matches.keys()) == 1 and len(downstream_matches.keys()) == 1:
 	    upstream_block_idx = upstream_matches.keys()[0]
 	    downstream_block_idx = downstream_matches.keys()[0]
-	    print 'blocks', downstream_block_idx, upstream_block_idx
 	    
 	    # allows novel exon in the junction
 	    if downstream_block_idx > upstream_block_idx:
@@ -1689,17 +1674,8 @@ class EventFinder:
 		exons = [upstream_exon, downstream_exon]
 		seq_breaks = [align.query_blocks[upstream_block_idx][1], align.query_blocks[downstream_block_idx][0]]
 		target_breaks = [align.blocks[upstream_block_idx][1], align.blocks[downstream_block_idx][0]]
-		#transcripts = [upstream_transcript, downstream_transcript]
 		orients = ['L', 'R']
-		
-		print 'zzz', upstream_gene, downstream_gene, upstream_block_idx, downstream_block_idx, target_breaks
-		
-		#if align.strand == '-':
-		    #seq_breaks.reverse()
-		    #target_breaks.reverse()
-		    ##transcripts.reverse()
-		    #exons.reverse()
-		
+
 		adj = Adjacency(align.query,
 		                (align.target, align.target),
 		                seq_breaks,
@@ -1726,17 +1702,18 @@ class EventFinder:
 		    adj.downstream_transcript = adj.transcripts[0]
 		    adj.exons_oriented = tuple(reversed(list(adj.exons)))
 		    adj.exon_bounds_oriented = tuple(reversed(list(adj.exon_bounds)))
-		print 'ggg', adj.transcripts[0].gene, adj.transcripts[1].gene, adj.upstream_transcript.gene, adj.downstream_transcript.gene
 		adj.update_transcript_breaks()
 		
-		#print 'ggg', adj.event, adj.genome_breaks, transcripts[0].id, transcripts[1].id, transcripts[0].gene, transcripts[1].gene
-		#self.is_sense_fusion(adj, (align.strand, align.strand), 'genome')
 		return adj
 	return None
     
     @classmethod
     def set_frame(cls, adjs, query_fasta, genome_fasta):
 	for adj in adjs:
+	    # already set in repeat_expansion/reduction cases
+	    if adj.in_frame:
+		continue
+
 	    seq_id = adj.seq_id.split(',')[0]
 	    query_seq = query_fasta.fetch(seq_id)
 	    seq_breaks = sorted(map(int, adj.seq_breaks.split(',')[0].split('-')))
@@ -1746,7 +1723,6 @@ class EventFinder:
 	    if adj.upstream_transcript and adj.downstream_transcript:
 		transcripts = (adj.upstream_transcript, adj.downstream_transcript)
 		
-	    #print 'yyy', seq_id, seq_breaks, genome_breaks, transcripts, adj.event, adj.size
 	    if transcripts:
 		in_frame = check_frame(query_seq,
 		                       seq_breaks,
