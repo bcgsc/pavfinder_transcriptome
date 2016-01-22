@@ -204,6 +204,7 @@ class EventFinder:
 	mappings_by_query = {}
 	partial_aligns = []
 	for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
+	    print 'processing', query
 	    events = []
 	    query_seq = query_fasta.fetch(query)
 	    mappings_by_query[query] = {}
@@ -240,9 +241,9 @@ class EventFinder:
 		    print '%s:cannot map to transcript' % aligns[0].query
 		    continue		
 						
-		tids, genes = get_mapping_genes(block_matches, align)
+		tids, genes = get_mapping_genes(block_matches, aligns[0])
 		if len(genes) > 1:
-		    adj = self.is_read_through_from_single_align(block_matches, align)
+		    adj = self.is_read_through_from_single_align(block_matches, aligns[0])
 		    if adj is not None:
 			self.update_adj(adj, (aligns[0],aligns[0]), query_seq, target_type, block_matches=block_matches)
 			if filter_adj(adj):
@@ -698,12 +699,16 @@ class EventFinder:
 	       adj.transcripts[0].is_coding() and\
 	       not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
 	       not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
-		if adj.exons[0] == adj.exons[1]:
+		if abs(adj.exons[0] - adj.exons[1]) <= 1:
 		    adj.event = 'ITD'
 		else:
 		    adj.event = 'PTD'
 	    #else:
 		#adj.event = adj.rearrangement
+
+	# only need reads to cross the breakpoint, not covering the entire novel sequence (could be larger than a read)
+	if adj.event in ('dup', 'ITD', 'PTD', 'ins'):
+	    adj.support_span = (adj.seq_breaks[0], adj.seq_breaks[0] + 1)
 			    
 	if (adj.event == 'None' or adj.event is None) and adj.rearrangement is not None:
 	    adj.event = adj.rearrangement
@@ -1159,7 +1164,6 @@ class EventFinder:
 		                                        query_fasta, 
 		                                        target_fasta,
 		                                        align.strand):
-			#pass
 			self.is_duplication(adj,
 			                    query_fasta.fetch(align.query),
 			                    target_fasta,
