@@ -11,19 +11,6 @@ from shared.translate import check_frame
 
 def combine_events(events, mappings):
     """Combine events via genome and transcripts alignment on contig level"""
-    #def same_event(event_t, event_g):
-        #event_t_tids = [event_t.transcripts[0].id, event_t.transcripts[1].id]
-        #event_g_tids = [event_g.transcripts[0].id, event_g.transcripts[1].id]
-        ##print 'a', event_t.rearrangement == event_g.rearrangement
-        ##print 'b', event_t.transcripts == event_g.transcripts
-        ##print 'aa', event_t_tids == event_g_tids
-        ##print 'c', event_t.exons == event_g.exons
-        #if event_t.rearrangement == event_g.rearrangement and\
-           #sorted(event_t_tids) == sorted(event_g_tids) and\
-           #sorted(list(event_t.exons)) == sorted(list(event_g.exons)):
-            #return True
-        #return False
-    
     def same_event(event_t, event_g, window=100):
         if event_t.rearrangement == event_g.rearrangement or\
            event_t.event == event_g.event:
@@ -32,8 +19,6 @@ def combine_events(events, mappings):
             seq_breaks_t = sorted(event_t.seq_breaks)
             seq_breaks_g = sorted(event_g.seq_breaks)
             
-            #if abs(genome_breaks_t[0] - genome_breaks_g[0]) <= window and\
-               #abs(genome_breaks_t[1] - genome_breaks_g[1]) <= window:
             if abs(seq_breaks_t[0] - seq_breaks_g[0]) <= window and\
                abs(seq_breaks_t[1] - seq_breaks_g[1]) <= window:
                 if event_g.exon_bounds and\
@@ -119,17 +104,6 @@ def combine_events(events, mappings):
                         combined_events.append(events_g[i])
                         
     return combined_events
-
-#def find_gene_mappings(bam, transcripts_dict):
-    #mappings = {}
-    #for aln in bam.fetch(until_eof=True):
-        #if aln.is_unmapped:
-            #continue
-        #tid = bam.getrname(aln.tid)
-        #if not mappings.has_key(aln.query_name):
-            #mappings[aln.query_name] = Set()
-        #mappings[aln.query_name].add(transcripts_dict[tid].gene)
-    #return mappings
      
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -214,7 +188,6 @@ def main():
                                                                                 only_exon_bound_fusion=not args.include_non_exon_bound_fusion
                                                                                 )        
 
-    #print 'bbb', mappings['via_transcripts'], mappings['via_genome'] 
     events_combined = combine_events(events, mappings)
     events_merged = Adjacency.merge(events_combined)
     
