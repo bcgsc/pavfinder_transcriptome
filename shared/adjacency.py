@@ -328,22 +328,49 @@ class Adjacency:
 	Returns:
 	    A string that is used for grouping adjacencies
 	"""
+	def is_sorted():
+	    if self.chroms[0] != self.chroms[1]:
+		if self.chroms[0].isdigit() or self.chroms[1].isdigit():
+		    if self.chroms[0].isdigit() and self.chroms[1].isdigit():
+			if int(self.chroms[0]) > int(self.chroms[1]):
+			    return False
+		    elif self.chroms[1].isdigit():
+			return False
+		elif self.chroms[0] > self.chroms[1]:
+		    return False
+	    elif self.genome_breaks[0] > self.genome_breaks[1]:
+		return False
+
+	    return True
+
+	def reverse():
+	    chroms = (self.chroms[1], self.chroms[0])
+	    genome_breaks = (self.genome_breaks[1], self.genome_breaks[0])
+	    orients = None
+	    if self.orients:
+		orients = (self.orients[1], self.orients[0])
+	    return chroms, genome_breaks, orients
+
 	if self.event is not None:
 	    info = [self.event]
 	else:
 	    info = [self.rearrangement]
+
+	chroms = self.chroms
+	genome_breaks = self.genome_breaks
+	orients = self.orients
+	if not is_sorted():
+	    chroms, genome_breaks, orients = reverse()
+
 	for i in (0,1):
-	    info.append(self.chroms[i])
-	    info.append(self.genome_breaks[i])
+	    info.append(chroms[i])
+	    info.append(genome_breaks[i])
 	    if self.orients and\
-	       ((type(self.orients) is tuple or type(self.orients) is list) and\
-	        len(self.orients) == 2):
-		info.append(self.orients[i])
+	       ((type(orients) is tuple or type(orients) is list) and\
+	        len(orients) == 2):
+		info.append(orients[i])
 	    else:
 		info.append('na')
-	    #else:
-		#print 'wwww', self.seq_id, self.details(), self.orients
-	    #info.append(self.novel_seq)
 	return '-'.join(map(str, info))
     
     def update_transcript(self, transcript):
@@ -424,15 +451,11 @@ class Adjacency:
 	merged = defaultdict(list)
 	for adj in all_adjs:
 	    adj.update_support_span()
+	    print 'ttt', adj.seq_id, adj.key()
 	    merged[adj.key()].append(adj)
 	    
 	merged_adjs = []
 	for key, adjs in merged.iteritems():
-	    #for adj in adjs:
-		#print 'merged', adj.details()
-	    #for attr in ('seq_id', 'seq_breaks'):
-		#print 'merged', attr, merge_attr(adjs, attr)
-		
 	    if len(adjs) == 1:
 		for attr in ('seq_id', 'seq_breaks', 'support_span', 'probe'):
 		    setattr(adjs[0], attr, merge_attr([adjs[0]], attr))
