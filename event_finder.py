@@ -479,20 +479,6 @@ class EventFinder:
 		    fa.write('>%s:%s:%d\n%s\n' % (seq_id, event.key(), i, subseqs[i]))
 		    count += 1
 		
-		
-		#if (event.rearrangement is not None and 'dup' in event.rearrangement) or\
-		   #(event.event is not None and\
-		    #event.event in ('alt_donor', 'alt_acceptor', 'skipped_exon')):
-		    #continue
-		
-		#if (type(event.size) is str or event.size >= min_size) or event.size is None: 
-		    #seq_id = event.seq_id.split(',')[0]
-		    #seq_breaks = event.seq_breaks.split(',')[0].split('-')
-		    #subseqs = event.get_subseqs(query_fa.fetch(seq_id), seq_breaks=seq_breaks)
-		
-		    #for i in range(len(subseqs)):
-			#fa.write('>%s:%s:%d\n%s\n' % (seq_id, event.key(), i, subseqs[i]))
-			#count += 1
 	    fa.close()
 	    return count
 	
@@ -542,12 +528,14 @@ class EventFinder:
 	    subseq_mappings = {}
 	    for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
 		seq_id, key, part = query.split(':')
-		print 'ggg', seq_id, key, part
+		event_type, chrom1, pos1, orient1, chrom2, pos2, orient2 = key.split('-')
+		#print 'ggg', seq_id, key, part
 		alns = list(group)
 		    
 		# subseq multi-maps -> remove
-		full_mapped_alns = [aln for aln in alns if is_mapped(aln, 1)]
+		full_mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
 		if len(full_mapped_alns) > 1:
+		    removed = True
 		    if debug:
 			print '%s - subseq multi-map' % query
 		    for i in events_by_query[seq_id]:
@@ -558,11 +546,6 @@ class EventFinder:
 		
 		mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
 		if mapped_alns:
-		    #seq_id, key, part = query.split(':')
-		    #print 'ggg', seq_id, key, part
-		    
-		    event_type, chrom1, pos1, orient1, chrom2, pos2, orient2 = key.split('-')
-		    print 'ggg2', event_type, chrom1, pos1, orient1, chrom2, pos2, orient2
 		    matched = []
 		    if not subseq_mappings.has_key(seq_id):
 			subseq_mappings[seq_id] = {}
@@ -574,32 +557,18 @@ class EventFinder:
 			   aln.reference_start >= int(pos1) - window and\
 			   aln.reference_start <= int(pos1) + window:
 			    matched.append(1)
-			    break
+
 			if target == chrom2 and\
 			   aln.reference_start >= int(pos2) - window and\
 			   aln.reference_start <= int(pos2) + window:
 			    matched.append(2)
-			    break
-		    print 'ggg3', seq_id, key, part, matched
+
 		    subseq_mappings[seq_id][key][part] = matched
-			
-		## subseq multi-maps -> remove
-		#full_mapped_alns = [aln for aln in alns if is_mapped(aln, 1)]
-		#if len(full_mapped_alns) > 1:
-		    #if debug:
-			#print '%s - subseq multi-map' % query
-			
-		    #for i in events_by_query[seq_id]:
-			#if events[i].key() == key:
-			    #remove.add(i)
-			    ##print 'remove', i, events[i].seq_id
-			    #break
 			    
 	    for seq_id in events_by_query.keys():
 		if subseq_mappings.has_key(seq_id):
 		    for i in events_by_query[seq_id]:
-			if subseq_mappings[seq_id].has_key(events[i].key()):
-			    print 'gggb', seq_id, events[i].key(), subseq_mappings[seq_id][events[i].key()]
+			if subseq_mappings[seq_id].has_key(events[i].key()):	    
 			    if subseq_mappings[seq_id][events[i].key()].has_key('0') and\
 			       subseq_mappings[seq_id][events[i].key()].has_key('1') and\
 			       (not subseq_mappings[seq_id][events[i].key()]['0'] or\
