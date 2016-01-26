@@ -55,6 +55,7 @@ class EventFinder:
 			                                                        seq_type,
 			                                                        junc_seq)
 			return False
+		return True
     
 	    if no_indels and adj.rearrangement in ('ins', 'del'):
 		return False
@@ -95,7 +96,6 @@ class EventFinder:
 	    if adj.novel_seq is not None and adj.novel_seq != 'na' and not check_junc_seq(novel=True):
 		return False
 	    
-	    #if adj.probe is None or len(adj.probe) == 0:
 	    if adj.probe is not None and len(adj.probe) > 0 and self.is_homopolymer_fragment(adj.probe):
 		print '%s: probe sequence high in 1 base %s' % (adj.seq_id, adj.probe)
 		return False
@@ -126,10 +126,6 @@ class EventFinder:
 		    print '%s: not exon-bound fusions %s' % (adj.seq_id, adj.exon_bounds)
 		    return False
 		
-		#if adj.probe is not None and self.is_homopolymer_fragment(adj.probe):
-		    #print '%s: fusion rejected - probe is homopolymer %s' % (adj.seq_id, adj.probe)
-		    #return False
-
 	    return True
 
 	def screen_genes(adj):
@@ -163,7 +159,6 @@ class EventFinder:
 			continue
 		    
 		if filter_adj(adj):
-		    print 'final3', adj.details()
 		    adjs_filtered.append(adj)
 	    return adjs_filtered
 	
@@ -419,7 +414,6 @@ class EventFinder:
 			if not bad:
 			    window = 20
 			    chroms = list(itemgetter(1,4)(key.split('-')))
-			    print 'ttt', key, seq_id, key.split('-')
 			    break_pos = list(map(int, itemgetter(2,5)(key.split('-'))))
 			    matched = []
 			    for aln in alns:
@@ -529,7 +523,6 @@ class EventFinder:
 	    for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
 		seq_id, key, part = query.split(':')
 		event_type, chrom1, pos1, orient1, chrom2, pos2, orient2 = key.split('-')
-		#print 'ggg', seq_id, key, part
 		alns = list(group)
 		    
 		# subseq multi-maps -> remove
@@ -1150,7 +1143,7 @@ class EventFinder:
 
 	return adjs
     
-    def is_duplication(self, adj, query_seq, target_fasta, strand, min_size_to_align=50):
+    def is_duplication(self, adj, query_seq, target_fasta, strand, min_size_to_align=20, min_size_for_terminal_snp=20):
 	query_name = adj.seq_id
 	target_name = '%s:%s-%s' % (adj.targets[0], adj.target_breaks[0], adj.target_breaks[1])
 	
@@ -1166,15 +1159,25 @@ class EventFinder:
 	except:
 	    return
     
-	matches_downstream = search_by_regex(novel_seq, target_downstream_seq)
+	novel_seqs = [novel_seq]
+	if len(novel_seq) >= min_size_for_terminal_snp:
+	    novel_seqs.append(novel_seq[1:])
+	    novel_seqs.append(novel_seq[:-1])
+	for ns in novel_seqs:
+	    matches_downstream = search_by_regex(ns, target_downstream_seq)
+	    if matches_downstream:
+		break
 	if not matches_downstream:
-	    matches_upstream = search_by_regex(novel_seq, target_upstream_seq)
+	    for ns in novel_seqs:
+		matches_upstream = search_by_regex(ns, target_upstream_seq)
+		if matches_upstream:
+		    break
 	
 	# no matches, try alignment
 	#if not matches_downstream and not matches_upstream and len(novel_seq) >= min_size_to_align:
-	    #matches_downstream = search_by_align(novel_seq, target_downstream_seq, query_name, target_name, self.work_dir, debug=self.debug)
+	    #matches_downstream = search_by_align(novel_seq, target_downstream_seq, query_name, target_name, self.working_dir, debug=self.debug)
 	    #if not matches_downstream:
-		#matches_upstream = search_by_align(novel_seq, target_upstream_seq, query_name, target_name, self.work_dir, debug=self.debug)
+		#matches_upstream = search_by_align(novel_seq, target_upstream_seq, query_name, target_name, self.working_dir, debug=self.debug)
 		
 	if matches_downstream:
 	    matches = matches_downstream
@@ -1247,7 +1250,7 @@ class EventFinder:
 	    adj.repeat_seq = repeat_seq.upper()
 	    adj.copy_num_change = copy_num_change
 
-	def construct_seq(chrom, span, break_start, break_end=None, repeat_size=3, add=False, minus=False, repeat_seq=None, flank=5):
+	def construct_seq(chrom, span, break_start, break_end=None, repeat_size=3, add=False, minus=False, repeat_seq=None, flank=50):
 	    """start = begining coord of repeat, end = end coord"""
 	    if add and repeat_seq is not None:
 		return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start).lower() +\
@@ -1268,6 +1271,7 @@ class EventFinder:
 
 	    mid_genome_break = ((adj.genome_breaks[0] + 1) + (adj.genome_breaks[1] - 1)) / 2
 	    cds_pos = adj.transcripts[0].genome_coord_to_txt_coord(mid_genome_break, cds=True)
+	    repeat_spans = []
 	    if cds_pos is not None:
 		aa_pos = adj.transcripts[0].txt_coord_to_aa_coord(cds_pos)
 		if adj.genome_breaks[1] - adj.genome_breaks[0] < 4:
@@ -1291,33 +1295,38 @@ class EventFinder:
 		    shift_result = None
 		    if len(repeat_down) >= 1 and len(repeat_up) >= 1:
 			if repeat_down[0] == repeat_up[0] and repeat_down_nt[:3] == repeat_up_nt[:3]:
-			    print 'efg'
 			    repeat_end = aa_pos + 1 + (len(repeat_down) - 1)
 			    repeat_start = aa_pos - (len(repeat_up) - 1)
-
-			elif len(repeat_down) > 1:
-			    repeat_end = aa_pos + 1 + (len(repeat_down) - 1)
-			    repeat_start = aa_pos + 1
+			    repeat_spans.append((repeat_start, repeat_end))
 
 			else:
-			    repeat_start = aa_pos - (len(repeat_up) - 1)
-			    repeat_end = aa_pos
+			    if len(repeat_down) > 1:
+				repeat_end = aa_pos + 1 + (len(repeat_down) - 1)
+				repeat_start = aa_pos + 1
+				repeat_spans.append((repeat_start, repeat_end))
+
+			    if len(repeat_up) > 1:
+				repeat_start = aa_pos - (len(repeat_up) - 1)
+				repeat_end = aa_pos
+				repeat_spans.append((repeat_start, repeat_end))
 
 		    elif len(repeat_down) > 1:
 			repeat_end = aa_pos + 1 + (len(repeat_down) - 1)
 			repeat_start = aa_pos + 1
+			repeat_spans.append((repeat_start, repeat_end))
 
 		    else:
 			repeat_start = aa_pos - (len(repeat_up) - 1)
 			repeat_end = aa_pos
+			repeat_spans.append((repeat_start, repeat_end))
 
 		    #print 'kk', repeat_start, repeat_end, repeat_down, repeat_up, repeat_down_nt, repeat_up_nt, len(aa)
 		    #print 'kk2', aa[repeat_start - 1:repeat_end], len(aa[repeat_start - 1:repeat_end])
 		    #print 'kk2', aa[:repeat_start],len(aa[:repeat_start])
 		    #print 'kk2', aa[repeat_end:],len(aa[repeat_end:])
-		    return repeat_start, repeat_end
+		    return repeat_spans
 
-	    return None, None
+	    return []
 
 	def shift_coord(repeat_start, repeat_end):
 	    repeat_track_genome = (adj.transcripts[0].aa_coord_to_genome_coord(repeat_start),
@@ -1378,8 +1387,9 @@ class EventFinder:
 		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_end), (copy_num_ref, copy_num_ref - copy_num_change))
 	    return None
 
-	aa_repeat_span = identify_aa_repeat()
-	if aa_repeat_span[0] is not None and aa_repeat_span[1] is not None:
+	aa_repeat_spans = identify_aa_repeat()
+	#print 'eef', aa_repeat_spans
+	for aa_repeat_span in aa_repeat_spans:
 	    shift_result = shift_coord(aa_repeat_span[0], aa_repeat_span[1])
 	    if shift_result is not None:
 		repeat_start, repeat_end, repeat_seq, breaks, copy_num_change = shift_result
@@ -1387,6 +1397,7 @@ class EventFinder:
 		    update_adj(breaks, repeat_seq, copy_num_change)
 		elif adj.event == 'repeat_reduction':
 		    update_adj((breaks[0] - 1, breaks[1] + 1), repeat_seq, copy_num_change)
+		break
 
     def is_repeat_number_change(self, adj, query_fasta, target_fasta, strand, max_size=30):
 	def chop_seq(seq, size):
