@@ -283,7 +283,7 @@ class EventFinder:
 			    self.adjust_for_amino_acid_repeat(adj)
 			
 	    if events:
-		events_by_query[query] = events  
+		events_by_query[query] = events
 		    
 	    if not partially_aligned:
 		mappings_by_query[query] = genes, 'full'
@@ -330,11 +330,6 @@ class EventFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/probes.bam' % working_dir
 	    
-	    #cmd = 'gmap -D %s -d %s -t%d %s -n0 -f samse | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                                  #genome_index,
-	                                                                                  #nthreads,
-	                                                                                  #probes_fa,
-	                                                                                  #aln_bam_file)
 	    cmd = 'bwa mem %s/%s %s -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
 	                                                                   genome_index,
 	                                                                   probes_fa,
@@ -596,7 +591,8 @@ class EventFinder:
 			orients.append('R')
 		    else:
 			orients.append('L')
-		adj.orients = tuple(orients)
+		if orients:
+		    adj.orients = tuple(orients)
 		
 	genes = None
 	if target_type == 'genome':
