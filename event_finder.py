@@ -586,11 +586,17 @@ class EventFinder:
 			orients.append('R')
 		    else:
 			orients.append('L')
+		else:
+		    orients.append(adj.orients[0])
+
 		if adj.transcripts[1].strand == '-':
 		    if adj.orients[1] == 'L':
 			orients.append('R')
 		    else:
 			orients.append('L')
+		else:
+		    orients.append(adj.orients[1])
+
 		if orients:
 		    adj.orients = tuple(orients)
 		
@@ -641,7 +647,6 @@ class EventFinder:
 		self.is_sense_fusion(adj, (aligns[0].strand, aligns[1].strand), target_type)
 		    
 	    self.update_feature(adj)
-	    
 	    fix_orients()
 	    
 	adj.set_probe(query_seq)
