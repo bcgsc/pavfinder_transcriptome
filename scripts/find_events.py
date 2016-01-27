@@ -30,6 +30,8 @@ def combine_events(events, mappings):
                      event_t.exon_bounds[1]:
                     return event_t
                 else:
+                    if event_g.event in ('ITD'):
+                        return event_t
                     return event_g
         return False
             
