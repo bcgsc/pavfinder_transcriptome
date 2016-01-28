@@ -1,5 +1,6 @@
 import re
 import sys
+import os
 from sets import Set
 from operator import itemgetter
 import collections
@@ -49,7 +50,7 @@ class EventFinder:
 			                                                  junc_seq)
 			return False
 	
-		    if len(junc_seq) > 1 and self.is_homopolymer_fragment(junc_seq):
+		    if len(junc_seq) > 2 and self.is_homopolymer_fragment(junc_seq, min_pc=100):
 			print '%s: filter out %s - %s_seq %s is homopolymer' % (adj.seq_id,
 			                                                        adj.event,
 			                                                        seq_type,
@@ -307,25 +308,29 @@ class EventFinder:
     @classmethod
     def filter_probes(cls, events, genome_index_dir, genome_index, working_dir, debug=False):
 	def create_query_fasta(events, fa_file, min_size=0):
-	    count = 0
+	    qname_to_event = {}
 	    fa = open(fa_file, 'w')
 	    for event in events:
 		# don't check splicing events
 		if event.event is not None and\
 		   event.event in ('alt_donor', 'alt_acceptor', 'skipped_exon'):
 		    continue
-		
+
 		seq_id = event.seq_id.split(',')[0]
 		probe = event.probe.split(',')[0]
 		
 		if type(event.size) is str or event.size >= min_size: 
 		    if len(probe) > 0:
-			fa.write('>%s:%s:%s\n%s\n' % (seq_id, event.key(), event.size, probe))
-			count += 1
+			qname = '%s:%s:%s' % (seq_id, event.key(), event.size)
+			fa.write('>%s\n%s\n' % (qname, probe))
+			qname_to_event[qname] = event
 		    else:
 			print 'probe empty', seq_id, event.keys(), probe
 	    fa.close()
-	    return count
+	    fai = fa_file + '.fai'
+	    if os.path.exists(fai):
+		os.remove(fai)
+	    return qname_to_event
 	
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/probes.bam' % working_dir
@@ -350,7 +355,34 @@ class EventFinder:
 	    else:
 		return None
 	    
-	def parse_and_filter(bam, indel_size_check=20):
+	def parse_and_filter(bam, fasta_file, qname_to_event, indel_size_check=20):
+	    def within_same_gene(alns, query_seq, event, min_mapped=0.9):
+		"""check if subseq of fusion lie in same gene or do not lie in one of the genes"""
+		query_spans = intspan()
+		aligns = []
+		for aln in alns:
+		    if not aln.is_unmapped:
+			align = Alignment.from_alignedRead(aln, bam)
+			query_spans.add('%s-%s' % (align.qstart, align.qend))
+			aligns.append(align)
+
+		if float(len(query_spans)) / len(query_seq) > min_mapped:
+		    mappings = collections.defaultdict(list)
+		    for i in range(len(aligns)):
+			for transcript in event.transcripts:
+			    if aligns[i].target == transcript.chrom and\
+			       aligns[i].tstart >= transcript.exons[0][0] and\
+			       aligns[i].tend <= transcript.exons[-1][1]:
+				mappings[transcript.id].append(i)
+		    if not mappings:
+			return 'fusion subseq not mapped to either of the 2 genes'
+		    for transcript in event.transcripts:
+			if mappings.has_key(transcript.id) and len(mappings[transcript.id]) == len(alns):
+			    return 'fusion subseq mapped to only a single gene'
+		return False
+
+	    fasta = pysam.FastaFile(fasta_file)
+
 	    events_by_query = collections.defaultdict(list)
 	    for i in range(len(events)):
 		seq_id = events[i].seq_id.split(',')[0]
@@ -358,9 +390,10 @@ class EventFinder:
     
 	    remove = Set()
 	    for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
-		alns = list(group)		
+		alns = list(group)
+		event = qname_to_event[query]
+
 		aln = alns[0]
-		
 		seq_id, key, size = aln.query_name.split(':')
 		chrom = key.split('-')[1]
 		event_type = key.split('-')[0]
@@ -392,12 +425,12 @@ class EventFinder:
 			       (event_type == 'ins' and aln.cigartuples[1][0] != 1))):
 			    failed_reason = '%s %s probe align indel not matched %s' % (event_type, size, aln.cigarstring)
 			    bad = True
-			
+
 		elif 'repeat' not in event_type:
 		    if event_type in ('fusion', 'read_through') and not aln.is_unmapped and aln.cigartuples[0][0] == 0 and aln.cigartuples[-1][0] == 0:
 			failed_reason = 'probe align from end to end %s' % aln.cigarstring
 			bad = True
-			
+
 		    elif event_type == 'fusion':
 			chroms = itemgetter(1,4)(key.split('-'))
 			for target in [bam.getrname(aln.tid) for aln in alns]:
@@ -427,6 +460,13 @@ class EventFinder:
 				    unmatched_pos.append('%s:%s' % (chroms[i], break_pos[i]))
 				failed_reason = 'breakpoint pos not covered by probe - %s' % ','.join(unmatched_pos)
 				bad = True
+
+		    if not bad:
+			if event_type in ('fusion', 'read_through'):
+			    failed = within_same_gene(alns, fasta.fetch(aln.query_name), event)
+			    if failed:
+				failed_reason = failed
+				bad = True
 		    
 		if bad:
 		    if debug:
@@ -434,18 +474,16 @@ class EventFinder:
 		    for i in events_by_query[seq_id]:
 			if events[i].key() == key:
 			    remove.add(i)
-			    print 'remove', i, events[i].seq_id
 			    break
 			
 	    for i in sorted(list(remove), reverse=True):
-		print 'del', i, events[i].seq_id
 		del events[i]
 	    
 	query_fa_file = '%s/probes.fa' % working_dir
-	count = create_query_fasta(events, query_fa_file)
-	if count > 0:
+	qname_to_event = create_query_fasta(events, query_fa_file)
+	if qname_to_event:
 	    bam = run_align(query_fa_file)
-	    parse_and_filter(bam)
+	    parse_and_filter(bam, query_fa_file, qname_to_event)
 	    
     @classmethod
     def filter_subseqs(cls, events, query_fa, genome_index_dir, genome_index, working_dir, subseq_len=50, debug=False):
@@ -1005,10 +1043,6 @@ class EventFinder:
 	    #clipped_ends = extract_clipped_seq(query_seq, align.query_blocks)
 	    #new_aligns = []
 	    for pos, clipped_seq in clipped_ends.iteritems():
-		#if self.is_homopolymer_fragment(clipped_seq):
-		    #print '%s:skip partial because it is potentially homopolymer %s' % (align.query,
-		                                                                        #clipped_seq)
-		    #continue
 		if len(clipped_seq) <= min_len:
 		    print '%s:skip partial because it is too short %s %d' % (align.query,
 		                                                             clipped_seq,
