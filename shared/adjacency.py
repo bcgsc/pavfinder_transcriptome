@@ -347,7 +347,9 @@ class Adjacency:
 	    chroms = (self.chroms[1], self.chroms[0])
 	    genome_breaks = (self.genome_breaks[1], self.genome_breaks[0])
 	    orients = None
-	    if self.orients:
+	    if self.orients and len(self.orients) == 2 and\
+	       self.orients[0] is not None and\
+	       self.orients[1] is not None:
 		orients = (self.orients[1], self.orients[0])
 	    return chroms, genome_breaks, orients
 
