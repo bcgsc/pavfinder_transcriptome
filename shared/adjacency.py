@@ -466,8 +466,6 @@ class Adjacency:
 		merged_adj = deepcopy(adjs[0])
 		for attr in ('seq_id', 'seq_breaks', 'support_span', 'probe'):
 		    setattr(merged_adj, attr, merge_attr(adjs, attr))
-		print 'merged_adj', merged_adj.details()
 		merged_adjs.append(merged_adj)
 		
-	    print '====='
 	return merged_adjs

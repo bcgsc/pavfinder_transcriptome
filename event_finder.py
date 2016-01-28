@@ -290,15 +290,12 @@ class EventFinder:
 		mappings_by_query[query] = genes, 'full'
 	    else:
 		mappings_by_query[query] = genes, 'partial'
-	    print '---'
 		
 	if partial_aligns:
 	    new_aligns = self.map_partial_aligns(partial_aligns, query_fasta, target_type)
 	    
 	    for query, aligns in new_aligns.iteritems():
 		query_seq = query_fasta.fetch(query)
-		for i in range(len(aligns)):
-		    print 'yy', aligns[i].query, aligns[i].target, aligns[i].tstart, aligns[i].tend, aligns[i].qstart, aligns[i].qend, aligns[i].strand
 		events = process_split_aligns(aligns, query_seq)
 		if events:
 		    events_by_query[query] = events
@@ -823,7 +820,6 @@ class EventFinder:
 	
 	transcripts = [None, None]
 	aligns_mapped = self.map_aligns_to_adj(adj, aligns)
-	print 'mmm', adj.genome_breaks, adj.orients
 	if aligns_mapped and len(aligns_mapped) == len(aligns):
 	    transcripts[0] = map_transcript(aligns_mapped[0],
 	                                    adj.chroms[0],
@@ -1102,8 +1098,6 @@ class EventFinder:
 		
 	adjs = []
 		
-	print 'tttblocks', align.blocks
-	print 'tttqblocks', align.query_blocks
 	if re.search('[ID]\d+', align.cigarstring):
 	    for i, j in extract_flanking_blocks():		
 		target_breaks = (align.blocks[i][1], align.blocks[j][0])
