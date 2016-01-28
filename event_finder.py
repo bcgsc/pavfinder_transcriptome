@@ -469,8 +469,7 @@ class EventFinder:
 				bad = True
 		    
 		if bad:
-		    if debug:
-			print '%s probe failed: %s' % (seq_id, failed_reason)
+		    print '%s probe failed: %s' % (seq_id, failed_reason)
 		    for i in events_by_query[seq_id]:
 			if events[i].key() == key:
 			    remove.add(i)
@@ -512,11 +511,6 @@ class EventFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/subseqs.bam' % working_dir
 	    
-	    #cmd = 'gmap -D %s -d %s -t%d %s -f samse | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                              #genome_index,
-	                                                                              #nthreads,
-	                                                                              #probes_fa,
-	                                                                              #aln_bam_file)
 	    cmd = 'bwa mem %s/%s %s -a -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
 	                                                                      genome_index,
 	                                                                      probes_fa,
@@ -562,8 +556,7 @@ class EventFinder:
 		full_mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
 		if len(full_mapped_alns) > 1:
 		    removed = True
-		    if debug:
-			print '%s - subseq multi-map' % query
+		    print '%s - subseq multi-map' % query
 		    for i in events_by_query[seq_id]:
 			if events[i].key() == key:
 			    remove.add(i)
@@ -600,9 +593,8 @@ class EventFinder:
 			       (not subseq_mappings[seq_id][events[i].key()]['0'] or\
 			        not subseq_mappings[seq_id][events[i].key()]['1']):
 				remove.add(i)
-				if debug:
-				    print '%s: remove %s - subseq fully_mapped to another region' % (seq_id,
-				                                                                     events[i].key())
+				print '%s: remove %s - subseq fully_mapped to another region' % (seq_id,
+				                                                                 events[i].key())
 				break
 	    
 			
