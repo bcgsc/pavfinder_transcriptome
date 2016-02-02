@@ -206,7 +206,7 @@ def main():
         
     ef.set_frame(events_filtered, query_fasta, genome_fasta)
 
-    Adjacency.report_events(events_filtered, '%s/events.tsv' % args.outdir)
+    Adjacency.report_events(events_filtered, '%s/events.bedpe' % args.outdir)
 
 main()
     

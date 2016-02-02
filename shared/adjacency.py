@@ -47,6 +47,52 @@ class Adjacency:
          ]
     )
     
+    bedpe_items = OrderedDict(
+        [('chrom1', 'chroms,0'),
+         ('start1', None),
+         ('end1', 'genome_breaks,0'),
+         ('chrom2', 'chroms,1'),
+         ('start2', None),
+         ('end2', 'genome_breaks,1'),
+         ('name', None),
+         ('score', None),
+         ('strand1', None),
+         ('strand2', None),
+         ('orient1', 'orients,0'),
+         ('orient2', 'orients,1'),
+         ('event', 'event'),
+         ('size', 'size'),
+         ('gene1', None),
+         ('transcript1', None),
+         ('transcript_break1', 'transcript_breaks,0'),
+         ('exon1', 'exons,0',),
+         ('exon_bound1', 'exon_bounds,0'),
+         ('gene2', None),
+         ('transcript2', None),
+         ('transcript_break2', 'transcript_breaks,1'),
+         ('exon2', 'exons,1',),
+         ('exon_bound2', 'exon_bounds,1'),
+         ('gene_5prime', None),
+         ('gene_3prime', None),
+         ('exon_5prime', 'exons_oriented,0'),
+         ('exon_3prime', 'exons_oriented,1'),
+         ('feature', 'feature'),
+         ('seq_id', 'seq_id'),
+         ('seq_breaks', 'seq_breaks'),
+         ('ins_seq', 'ins_seq'),
+         ('homol_seq', 'homol_seq'),
+         ('homol_seq_coords', 'homol_seq_coords'),
+         ('novel_seq', 'novel_seq'),
+         ('novel_seq_coords', 'novel_seq_coords'),
+         ('copy_number_change', None),
+         ('repeat_seq', 'repeat_seq'),
+         ('in_frame', 'in_frame'),
+         ('probe', 'probe'),
+         ('support_span', 'support_span'),
+         ('support_reads', 'support'),
+         ]
+    )
+
     event_types = ['fusion', 'read_through', 'ITD', 'PTD', 'dup', 'ins', 'del', 'dup_inv', 'repeat_expansion', 'repeat_reduction']
 
     def __init__(self, seq_id, targets, seq_breaks, target_breaks,
@@ -165,7 +211,7 @@ class Adjacency:
 	data = []
 	for item, label in self.report_items.iteritems():
 	    value = 'na'
-	    if item == "ID":
+	    if item == "name":
 		if event_id is not None:
 		    value = event_id
 		    
@@ -219,8 +265,80 @@ class Adjacency:
 	    data.append(str(value))
 
 	return '\t'.join(data)
-	    
-	    	    
+
+    def as_bedpe(self, event_id=None):
+	data = []
+	for item, label in self.bedpe_items.iteritems():
+	    value = 'na'
+	    if item == "name":
+		if event_id is not None:
+		    value = event_id
+		else:
+		    value = '.'
+
+	    elif item == 'start1':
+		value = self.genome_breaks[0] - 1
+
+	    elif item == 'start2':
+		value = self.genome_breaks[1] - 1
+
+	    elif 'strand' in item:
+		value = '+'
+
+	    elif item == 'score':
+		value = '.'
+
+	    elif label is not None and ',' in label:
+		attr, index = label.split(',')
+		if hasattr(self, attr):
+		    values = getattr(self, attr)
+		    if (type(values) is tuple or type(values) is list) and\
+		       len(values) > int(index):
+			value = values[int(index)]
+
+	    elif item[:4] == 'gene' and item[-1].isdigit():
+		if item[-1] == '1':
+		    value = self.transcripts[0].gene
+		elif item[-1] == '2':
+		    value = self.transcripts[1].gene
+
+	    elif item == 'gene_5prime':
+		if self.upstream_transcript is not None:
+		    value = self.upstream_transcript.gene
+		else:
+		    value = 'na'
+
+	    elif item == 'gene_3prime':
+		if self.downstream_transcript is not None:
+		    value = self.downstream_transcript.gene
+		else:
+		    value = 'na'
+
+	    elif item[:len('transcript')] == 'transcript' and item[-1].isdigit():
+		if item[-1] == '1':
+		    value = self.transcripts[0].id
+		elif item[-1] == '2':
+		    value = self.transcripts[1].id
+
+	    elif item == 'copy_number_change':
+		if self.copy_num_change is not None:
+		    value = '>'.join(map(str, self.copy_num_change))
+		else:
+		    value = 'na'
+
+	    elif hasattr(self, label):
+		val = getattr(self, label)
+		if val is not None:
+		    if (type(val) is tuple or type(val) is list) and\
+		       len(val) == 2:
+			value = '%s-%s' % (val[0], val[1])
+		    else:
+			value = val
+
+	    data.append(str(value))
+
+	return '\t'.join(data)
+
     @classmethod
     def report_events(cls, events, outfile):
 	def compare_coord(e1, e2):
@@ -247,7 +365,8 @@ class Adjacency:
 		return compare_coord(e1, e2)
 	
 	out = open(outfile, 'w')
-	out.write('%s\n' % '\t'.join(cls.report_items.keys()))
+	#out.write('%s\n' % '\t'.join(cls.report_items.keys()))
+	out.write('#%s\n' % '\t'.join(cls.bedpe_items.keys()))
 	
 	events_grouped = defaultdict(list)
 	for event in events:
@@ -258,14 +377,16 @@ class Adjacency:
 	    if events_grouped.has_key(event_type):
 		events_sorted = sorted(events_grouped[event_type], cmp = lambda e1, e2 : compare_event(e1, e2))
 		for event in events_sorted:
-		    out.write('%s\n' % event.report(event_id=counter))
+		    #out.write('%s\n' % event.report(event_id=counter))
+		    out.write('%s\n' % event.as_bedpe(event_id=counter))
 		    counter += 1
 	    else:
 		others.append(event_type)
 	for event_type in others:
 	    events_sorted = sorted(events_grouped[event_type], cmp = lambda e1, e2 : compare_event(e1, e2))
 	    for event in events_sorted:
-		out.write('%s\n' % event.report(event_id=counter))
+		#out.write('%s\n' % event.report(event_id=counter))
+		out.write('%s\n' % event.as_bedpe(event_id=counter))
 		counter += 1
         out.close()
     
