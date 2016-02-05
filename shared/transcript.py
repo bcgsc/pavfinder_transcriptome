@@ -356,15 +356,17 @@ class Transcript:
 		    gene = feature.attrs['gene_id']
 		strand = feature.strand
 		
-		if feature.attrs.has_key('gene_biotype') and feature.attrs['gene_biotype'] == 'protein_coding':
-		    coding = True
-		else:
-		    coding = False
+		coding = None
+		if feature.attrs.has_key('gene_biotype'):
+		    if feature.attrs['gene_biotype'] == 'protein_coding':
+			coding = True
 				
 		try:
 		    transcript = transcripts[transcript_id]
 		except:
-		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding, chrom=feature.chrom)
+		    transcript = Transcript(transcript_id, gene=gene, strand=strand, chrom=feature.chrom)
+		    if coding is not None:
+			transcript.coding = coding
 		    transcripts[transcript_id] = transcript
 		    
 		transcript.add_exon(exon)
@@ -378,9 +380,11 @@ class Transcript:
 		    gene = feature.attrs['gene_id']
 		strand = feature.strand
 		cds = (int(feature.start) + 1, int(feature.stop))
+		coding = True
 		
 		try:
 		    transcript = transcripts[transcript_id]
+		    transcript.coding = True
 		except:
 		    transcript = Transcript(transcript_id, gene=gene, strand=strand, coding=coding, chrom=feature.chrom)
 		    transcripts[transcript_id] = transcript
