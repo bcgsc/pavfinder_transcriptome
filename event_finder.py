@@ -755,6 +755,10 @@ class EventFinder:
 		return -1
 	    elif not m1['exon_bound'] and m2['exon_bound']:
 		return 1
+	    elif m1['coding'] and not m2['coding']:
+		return -1
+	    elif not m1['coding'] and m2['coding']:
+		return 1
 	    elif not m1['within_utr'] and m2['within_utr']:
 		return -1
 	    elif m1['within_utr'] and not m2['within_utr']:
@@ -766,10 +770,6 @@ class EventFinder:
 	    elif m1['num_perfect_matched_blocks'] > m2['num_perfect_matched_blocks']:
 		return -1
 	    elif m1['num_perfect_matched_blocks'] < m2['num_perfect_matched_blocks']:
-		return 1
-	    elif m1['coding'] and not m2['coding']:
-		return -1
-	    elif not m1['coding'] and m2['coding']:
 		return 1
 	    elif m1['num_exons'] > m2['num_exons']:
 		return -1
