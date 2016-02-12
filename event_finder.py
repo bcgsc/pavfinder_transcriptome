@@ -693,12 +693,6 @@ class EventFinder:
 		    adj.event = 'ITD'
 		else:
 		    adj.event = 'PTD'
-	    #else:
-		#adj.event = adj.rearrangement
-
-	# only need reads to cross the breakpoint, not covering the entire novel sequence (could be larger than a read)
-	if adj.event in ('dup', 'ITD', 'PTD', 'ins'):
-	    adj.support_span = (adj.seq_breaks[0], adj.seq_breaks[0] + 1)
 			    
 	if (adj.event == 'None' or adj.event is None) and adj.rearrangement is not None:
 	    adj.event = adj.rearrangement
@@ -1160,11 +1154,25 @@ class EventFinder:
     
 		if no_indels and adj.rearrangement in ('ins', 'del'):
 		    continue
+
 		adjs.append(adj)
 
 	return adjs
     
     def is_duplication(self, adj, query_seq, target_fasta, strand, min_size_to_align=20, min_size_for_terminal_snp=20):
+	def update_support_span(dup_is_up_in_target):
+	    seq_breaks = sorted(adj.seq_breaks)
+	    if dup_is_up_in_target:
+		if strand == '+':
+		    adj.support_span = (seq_breaks[0], seq_breaks[0] + 1)
+		else:
+		    adj.support_span = (seq_breaks[1] - 1, seq_breaks[1])
+	    else:
+		if strand == '+':
+		    adj.support_span = (seq_breaks[1] - 1, seq_breaks[1])
+		else:
+		    adj.support_span = (seq_breaks[0], seq_breaks[0] + 1)
+
 	query_name = adj.seq_id
 	target_name = '%s:%s-%s' % (adj.targets[0], adj.target_breaks[0], adj.target_breaks[1])
 	
@@ -1193,13 +1201,13 @@ class EventFinder:
 		matches_upstream = search_by_regex(ns, target_upstream_seq)
 		if matches_upstream:
 		    break
-	
+
 	# no matches, try alignment
 	#if not matches_downstream and not matches_upstream and len(novel_seq) >= min_size_to_align:
 	    #matches_downstream = search_by_align(novel_seq, target_downstream_seq, query_name, target_name, self.working_dir, debug=self.debug)
 	    #if not matches_downstream:
 		#matches_upstream = search_by_align(novel_seq, target_upstream_seq, query_name, target_name, self.working_dir, debug=self.debug)
-		
+
 	if matches_downstream:
 	    matches = matches_downstream
 	    if matches[0][0] == 1:
@@ -1208,6 +1216,7 @@ class EventFinder:
 		    adj.rearrangement = 'dup'
 		    adj.target_breaks = (adj.target_breaks[1] + len(novel_seq) - 1, adj.target_breaks[1])
 		    adj.orients = ('L', 'R')
+		    update_support_span(False)
 		else:
 		    # more work needed, novel sequence may actually be more than one copy
 		    print 'repeat_expansion?', adj.seq_id, novel_seq
@@ -1221,6 +1230,7 @@ class EventFinder:
 		    adj.rearrangement = 'dup'
 		    adj.target_breaks = (adj.target_breaks[0], adj.target_breaks[0] - len(novel_seq) + 1)
 		    adj.orients = ('L', 'R')
+		    update_support_span(True)
 		else:
 		    # more work needed, novel sequence may actually be more than one copy
 		    print 'repeat_expansion?', adj.seq_id, novel_seq
