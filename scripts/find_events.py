@@ -120,6 +120,7 @@ def parse_args():
     parser.add_argument("--r2c", type=str, help="reads to genome bam")
     parser.add_argument("--nproc", type=int, help="number of processes. Default:4", default=4)
     parser.add_argument("--genome_index", type=str, help="genome index path and name", nargs=2)
+    parser.add_argument("--sort_by_coord", action="store_true", help="sort output by genome coordinates")
     filtering = parser.add_argument_group('filtering')
     filtering.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
     filtering.add_argument("--min_indel_size", type=int, help="minimum indel size. Default:3", default=3)
@@ -206,7 +207,7 @@ def main():
         
     ef.set_frame(events_filtered, query_fasta, genome_fasta)
 
-    Adjacency.report_events(events_filtered, '%s/events.bedpe' % args.outdir)
+    Adjacency.report_events(events_filtered, '%s/events.bedpe' % args.outdir, sort_by_coord=args.sort_by_coord)
 
 main()
     
