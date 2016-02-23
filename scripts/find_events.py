@@ -13,7 +13,8 @@ def combine_events(events, mappings):
     """Combine events via genome and transcripts alignment on contig level"""
     def same_event(event_t, event_g, window=100):
         if event_t.rearrangement == event_g.rearrangement or\
-           event_t.event == event_g.event:
+           event_t.event == event_g.event or\
+           (event_t.event in ('fusion', 'read_through') and event_g.event in ('fusion', 'read_through')):
             genome_breaks_t = sorted(event_t.genome_breaks)
             genome_breaks_g = sorted(event_g.genome_breaks)
             seq_breaks_t = sorted(event_t.seq_breaks)
