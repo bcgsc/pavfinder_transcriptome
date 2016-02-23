@@ -626,7 +626,11 @@ class EventFinder:
 
 		if orients:
 		    adj.orients = tuple(orients)
-		
+
+	def sort_genome_breaks():
+	    if not adj.is_genome_breaks_sorted():
+		adj.reverse_genome_breaks(change=True, annotation=True)
+
 	genes = None
 	if target_type == 'genome':
 	    if len(aligns) == 1:
@@ -675,6 +679,7 @@ class EventFinder:
 		    
 	    self.update_feature(adj)
 	    fix_orients()
+	    sort_genome_breaks()
 	    
 	adj.set_probe(query_seq)
 	adj.size = adj.get_size()
