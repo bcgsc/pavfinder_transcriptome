@@ -1,5 +1,6 @@
 from sets import Set
 import sys
+import re
 from collections import defaultdict, OrderedDict
 from alignment import reverse_complement
 from copy import deepcopy
@@ -340,54 +341,58 @@ class Adjacency:
 	return '\t'.join(data)
 
     @classmethod
-    def report_events(cls, events, outfile):
-	def compare_coord(e1, e2):
-	    if e1.chroms[0] < e2.chroms[0]:
-		return -1
-	    elif e1.chroms[0] > e2.chroms[0]:
-		return 1
-	    elif int(e1.genome_breaks[0]) < int(e2.genome_breaks[0]):
-		return -1
-	    elif int(e1.genome_breaks[0]) > int(e2.genome_breaks[0]):
-		return 1
-	    else:
-		return 0
-	    
+    def report_events(cls, events, outfile, sort_by_coord=False):
 	def compare_event(e1, e2):
+	    cmp_coord_result = cls.cmp_genome_coords((e1.chroms[0], e1.genome_breaks[0], e1.genome_breaks[1]),
+	                                             (e2.chroms[0], e2.genome_breaks[0], e2.genome_breaks[1]))
+	    if cmp_coord_result != 0:
+		return cmp_coord_result
+
+	    cmp_coord_result = cls.cmp_genome_coords((e1.chroms[1], e1.genome_breaks[1], e1.genome_breaks[1]),
+	                                             (e2.chroms[1], e2.genome_breaks[1], e2.genome_breaks[1]))
+
+	    if cmp_coord_result != 0:
+		return cmp_coord_result
+
 	    if e1.support is not None and e2.support is not None:
 		if int(e1.support) > int(e2.support):
 		    return -1
 		elif int(e2.support) > int(e1.support):
 		    return 1
-		else:
-		    return compare_coord(e1, e2)
-	    else:
-		return compare_coord(e1, e2)
-	
+
+	    return 0
+
 	out = open(outfile, 'w')
 	#out.write('%s\n' % '\t'.join(cls.report_items.keys()))
 	out.write('#%s\n' % '\t'.join(cls.bedpe_items.keys()))
 	
-	events_grouped = defaultdict(list)
-	for event in events:
-	    events_grouped[event.event].append(event)
-	others = []
-	counter = 1
-	for event_type in cls.event_types:
-	    if events_grouped.has_key(event_type):
+	if not sort_by_coord:
+	    events_grouped = defaultdict(list)
+	    for event in events:
+		events_grouped[event.event].append(event)
+	    others = []
+	    counter = 1
+	    for event_type in cls.event_types:
+		if events_grouped.has_key(event_type):
+		    events_sorted = sorted(events_grouped[event_type], cmp = lambda e1, e2 : compare_event(e1, e2))
+		    for event in events_sorted:
+			out.write('%s\n' % event.as_bedpe(event_id=counter))
+			counter += 1
+		else:
+		    others.append(event_type)
+	    for event_type in others:
 		events_sorted = sorted(events_grouped[event_type], cmp = lambda e1, e2 : compare_event(e1, e2))
 		for event in events_sorted:
-		    #out.write('%s\n' % event.report(event_id=counter))
 		    out.write('%s\n' % event.as_bedpe(event_id=counter))
 		    counter += 1
-	    else:
-		others.append(event_type)
-	for event_type in others:
-	    events_sorted = sorted(events_grouped[event_type], cmp = lambda e1, e2 : compare_event(e1, e2))
+
+	else:
+	    events_sorted = sorted(events, cmp = lambda e1, e2 : compare_event(e1, e2))
+	    counter = 1
 	    for event in events_sorted:
-		#out.write('%s\n' % event.report(event_id=counter))
 		out.write('%s\n' % event.as_bedpe(event_id=counter))
 		counter += 1
+
         out.close()
     
     def as_tab(self):        
@@ -440,6 +445,77 @@ class Adjacency:
 	    return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
 	except:
 	    return (self.contig_breaks[contig_index][0], self.contig_breaks[contig_index][1])
+
+    @classmethod
+    def cmp_genome_coords(cls, coord1, coord2):
+	def extract_chrom(chrom):
+	    if chrom.isdigit():
+		return None, int(chrom)
+	    else:
+		m = re.search(r'^(\D+)(\d+)$', chrom)
+		if m:
+		    return m.group(1), int(m.group(2))
+	    return None, chrom
+
+	if coord1[0] != coord2[0]:
+	    prefix1, chrom1 = extract_chrom(coord1[0])
+	    prefix2, chrom2 = extract_chrom(coord2[0])
+
+	    if prefix1 == prefix2:
+		if chrom1 < chrom2:
+		    return -1
+		else:
+		    return 1
+	    else:
+		if coord1[0] < coord2[0]:
+		    return -1
+		else:
+		    return 1
+	else:
+	    if int(coord1[1]) < int(coord2[1]):
+		return -1
+	    elif int(coord1[1]) > int(coord2[1]):
+		return 1
+	    elif int(coord1[2]) < int(coord2[2]):
+		return -1
+	    elif int(coord1[2]) > int(coord2[2]):
+		return 1
+	    else:
+		return 0
+
+    def is_genome_breaks_sorted(self):
+	if self.cmp_genome_coords((self.chroms[0], self.genome_breaks[0], self.genome_breaks[1]),
+	                          (self.chroms[1], self.genome_breaks[1], self.genome_breaks[1])) <= 0:
+	    return True
+	else:
+	    return False
+
+    def reverse_genome_breaks(self, change=False, annotation=False):
+	def flip(fields, new_vals):
+	    for field in fields:
+		new_vals[field] = None
+		if hasattr(self, field):
+		    val = getattr(self, field)
+		    if type(val) is tuple or type(val) is list:
+			new_vals[field] = tuple(reversed(val))
+
+	fields = ('chroms', 'genome_breaks', 'orients')
+	new_vals = {}
+	flip(fields, new_vals)
+
+	if not change:
+	    if not None in new_vals.values():
+		returnable = []
+		for field in fields:
+		    returnable.append(new_vals[field])
+		return returnable
+	else:
+	    if annotation:
+		annot_fields = ('transcripts', 'transcript_breaks', 'exons', 'exon_bounds')
+		flip(annot_fields, new_vals)
+	    if not None in new_vals.values():
+		for field, val in new_vals.iteritems():
+		    setattr(self, field, val)
 	            
     def key(self):
 	"""Constructs a unique key for grouping adjacencies
@@ -449,31 +525,6 @@ class Adjacency:
 	Returns:
 	    A string that is used for grouping adjacencies
 	"""
-	def is_sorted():
-	    if self.chroms[0] != self.chroms[1]:
-		if self.chroms[0].isdigit() or self.chroms[1].isdigit():
-		    if self.chroms[0].isdigit() and self.chroms[1].isdigit():
-			if int(self.chroms[0]) > int(self.chroms[1]):
-			    return False
-		    elif self.chroms[1].isdigit():
-			return False
-		elif self.chroms[0] > self.chroms[1]:
-		    return False
-	    elif self.genome_breaks[0] > self.genome_breaks[1]:
-		return False
-
-	    return True
-
-	def reverse():
-	    chroms = (self.chroms[1], self.chroms[0])
-	    genome_breaks = (self.genome_breaks[1], self.genome_breaks[0])
-	    orients = None
-	    if self.orients and len(self.orients) == 2 and\
-	       self.orients[0] is not None and\
-	       self.orients[1] is not None:
-		orients = (self.orients[1], self.orients[0])
-	    return chroms, genome_breaks, orients
-
 	if self.event is not None:
 	    info = [self.event]
 	else:
@@ -482,8 +533,8 @@ class Adjacency:
 	chroms = self.chroms
 	genome_breaks = self.genome_breaks
 	orients = self.orients
-	if not is_sorted():
-	    chroms, genome_breaks, orients = reverse()
+	if not self.is_genome_breaks_sorted():
+	    chroms, genome_breaks, orients = self.reverse_genome_breaks()
 
 	for i in (0,1):
 	    info.append(chroms[i])
@@ -574,7 +625,6 @@ class Adjacency:
 	merged = defaultdict(list)
 	for adj in all_adjs:
 	    adj.update_support_span()
-	    print 'ttt', adj.seq_id, adj.key()
 	    merged[adj.key()].append(adj)
 	    
 	merged_adjs = []
