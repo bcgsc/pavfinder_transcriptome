@@ -106,7 +106,7 @@ class Adjacency:
                  ins_seq = None, ins_seq_coords = None,
                  copy_num_change = None, repeat_seq = None,
                  upstream_transcript = None, downstream_transcript = None,
-                 exons_oriented = None, exon_bounds_orient = None,
+                 exons_oriented = None, exon_bounds_oriented = None,
                  feature = None, effect = None, in_frame = None, sense_fusion=None,
                  support_span=None, support = None,
                  probe=None, size=None, link=None):
@@ -134,7 +134,32 @@ class Adjacency:
 		transcript_breaks.append(self.transcripts[i].genome_coord_to_txt_coord(self.genome_breaks[i]))
 	    self.transcript_breaks = tuple(transcript_breaks)
 	    
-    def update_exons(self):
+    def update_exons(self, target_type):
+	"""Update exons and exon_bounds
+
+	Argument:
+	    target_type: "transcripts" or "genome"
+	    if target_type is "genome", orient and transcript.strand need to be considered
+	    if target_type is "transcripts", only orient needs to be considered
+	"""
+	def check_exon_bound(exon_bound_edge, orient, transcript):
+	    exon_bound = False
+	    if exon_bound_edge is not None:
+		if target_type == 'genome':
+		    if transcript.strand == '+':
+			if (orient == 'L' and exon_bound_edge == 3) or\
+			   (orient == 'R' and exon_bound_edge == 5):
+			    exon_bound = True
+		    else:
+			if (orient == 'R' and exon_bound_edge == 3) or\
+			   (orient == 'L' and exon_bound_edge == 5):
+			    exon_bound = True
+		elif target_type == 'transcripts':
+		    if (orient == 'L' and exon_bound_edge == 3) or\
+		       (orient == 'R' and exon_bound_edge == 5):
+			exon_bound = True
+	    return exon_bound
+
 	if not self.exons and not self.exon_bounds:
 	    exons = []
 	    exon_bounds = []
@@ -142,17 +167,106 @@ class Adjacency:
 		if self.transcript_breaks:
 		    for i in range(len(self.transcript_breaks)):
 			exons.append(self.transcripts[i].txt_coord_to_exon(self.transcript_breaks[i]))
-			exon_bounds.append(self.transcripts[i].at_exon_bound(txt_coord = self.transcript_breaks[i],
-			                                                     exon_num = exons[-1]))
+			exon_bound_edge = self.transcripts[i].at_exon_bound(txt_coord = self.transcript_breaks[i],
+			                                                    exon_num = exons[-1],
+			                                                    return_edge=True)
+			exon_bounds.append(check_exon_bound(exon_bound_edge, self.orients[i], self.transcripts[i]))
+
 		elif self.genome_breaks:
 		    for i in range(len(self.genome_breaks)):
 			exons.append(self.transcripts[i].coord_to_exon(self.genome_breaks[i]))
-			exon_bounds.append(self.transcripts[i].at_exon_bound(genome_coord = self.genome_breaks[i],
-			                                                     exon_num = exons[-1]))		
+			exon_bound_edge = self.transcripts[i].at_exon_bound(genome_coord = self.genome_breaks[i],
+			                                                    exon_num = exons[-1],
+			                                                    return_edge = True)
+			exon_bounds.append(check_exon_bound(exon_bound_edge, self.orients[i], self.transcripts[i]))
+
 		if exons and exon_bounds:
 		    self.exons = tuple(exons)
 		    self.exon_bounds = tuple(exon_bounds)
-		                     
+
+    def change_tuple(self, attr, index, value):
+	"""Change value in tuple-type attribute (used in adjust_transcript_breaks()"""
+	values = list(getattr(self, attr))
+	values[index] = value
+	setattr(self, attr, tuple(values))
+
+    def adjust_transcript_breaks(self, align_strands):
+	"""Adjust breakpoint positions if exon_bound not True when there is homology"""
+	def check_exon_bound(exon_bound_edge, orient):
+	    exon_bound = False
+	    if exon_bound_edge is not None:
+		if (orient == 'L' and exon_bound_edge == 3) or\
+		   (orient == 'R' and exon_bound_edge == 5):
+		    exon_bound = True
+	    return exon_bound
+
+	seq_breaks = self.seq_breaks
+	transcript_breaks = self.transcript_breaks
+
+	if not self.exon_bounds[0]:
+	    for i in range(1, len(self.homol_seq) + 1):
+		sbreak = seq_breaks[0] - i
+		if align_strands[0] == '+':
+		    tbreak = transcript_breaks[0] - i
+		else:
+		    tbreak = transcript_breaks[0] + i
+		homol_seq = self.homol_seq[:-1*i]
+		homol_seq_coords = list(self.homol_seq_coords)
+		homol_seq_coords[1] -= i
+		if not homol_seq:
+		    homol_seq = None
+		    homol_seq_coords = None
+		exon_num = self.transcripts[0].txt_coord_to_exon(tbreak)
+		exon_bound_edge = self.transcripts[0].at_exon_bound(txt_coord = tbreak,
+		                                                    exon_num = exon_num,
+		                                                    return_edge=True)
+		gbreak = self.transcripts[0].txt_coord_to_genome_coord(tbreak)
+
+		if check_exon_bound(exon_bound_edge, self.orients[0]):
+		    self.change_tuple('exons', 0, exon_num)
+		    self.change_tuple('exon_bounds', 0, True)
+		    self.change_tuple('transcript_breaks', 0, tbreak)
+		    self.change_tuple('genome_breaks', 0, gbreak)
+		    self.change_tuple('seq_breaks', 0, sbreak)
+		    self.homol_seq = homol_seq
+		    if type(homol_seq_coords) is list:
+			self.homol_seq_coords = tuple(homol_seq_coords)
+		    else:
+			self.homol_seq_coords = homol_seq_coords
+		    break
+
+	if not self.exon_bounds[1]:
+	    for i in range(1, len(self.homol_seq) + 1):
+		sbreak = seq_breaks[1] + i
+		if align_strands[1] == '+':
+		    tbreak = transcript_breaks[1] + i
+		else:
+		    tbreak = transcript_breaks[1] - i
+		homol_seq = self.homol_seq[i:]
+		homol_seq_coords = list(self.homol_seq_coords)
+		homol_seq_coords[0] += i
+		if not homol_seq:
+		    homol_seq = None
+		    homol_seq_coords = None
+		exon_num = self.transcripts[1].txt_coord_to_exon(tbreak)
+		exon_bound_edge = self.transcripts[1].at_exon_bound(txt_coord = tbreak,
+		                                                    exon_num = exon_num,
+		                                                    return_edge=True)
+		gbreak = self.transcripts[1].txt_coord_to_genome_coord(tbreak)
+
+		if check_exon_bound(exon_bound_edge, self.orients[1]):
+		    self.change_tuple('exons', 1, exon_num)
+		    self.change_tuple('exon_bounds', 1, True)
+		    self.change_tuple('transcript_breaks', 1, tbreak)
+		    self.change_tuple('genome_breaks', 1, gbreak)
+		    self.change_tuple('seq_breaks', 1, sbreak)
+		    self.homol_seq = homol_seq
+		    if type(homol_seq_coords) is list:
+			self.homol_seq_coords = tuple(homol_seq_coords)
+		    else:
+			self.homol_seq_coords = homol_seq_coords
+		    break
+
     def details(self):
 	attr_values = []
 	for attr, value in self.__dict__.iteritems():
