@@ -235,7 +235,7 @@ class Adjacency:
 			self.homol_seq_coords = homol_seq_coords
 		    break
 
-	if not self.exon_bounds[1]:
+	if self.homol_seq and not self.exon_bounds[1]:
 	    for i in range(1, len(self.homol_seq) + 1):
 		sbreak = seq_breaks[1] + i
 		if align_strands[1] == '+':
