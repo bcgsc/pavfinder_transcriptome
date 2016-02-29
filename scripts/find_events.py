@@ -4,7 +4,6 @@ import pysam
 from sets import Set
 from shared.transcript import Transcript
 from event_finder import EventFinder
-from exon_mapper import ExonMapper
 from shared.adjacency import Adjacency
 from read_support import find_support
 from shared.translate import check_frame
@@ -47,7 +46,7 @@ def combine_events(events, mappings):
                 elif not mappings['via_genome'][query] or not mappings['via_genome'][query][0]:
                     print '%s: mapping disagreed transcripts:%s genome:None' % (query,
                                                                                 mappings['via_transcripts'][query])
-                elif mappings['via_transcripts'][query][0] & mappings['via_genome'][query][0]:
+                elif mappings['via_transcripts'][query][0] and mappings['via_genome'][query][0]:
                     passed = True
                 else:
                     print '%s: mapping disagreed transcripts:%s genome:%s' % (query,
