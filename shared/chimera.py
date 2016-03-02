@@ -5,7 +5,6 @@ from adjacency import Adjacency
 
 def find_chimera(aligns, query_seq=None, max_splits=3, debug=False):
     path = find_paths(aligns, min_coverage=0.01, debug=debug)
-    
     adjs = []
     if path:
 	chimeric_aligns = [aligns[idx] for idx in path]
@@ -154,7 +153,7 @@ def call_event(align1, align2, query_seq=None, no_sort=False, max_inv_target_ola
 
     # homol seq
     if query_seq is not None and query_breaks[0] >= query_breaks[1]:
-	homol_coords = [query_breaks[1], query_breaks[0]]
+	homol_seq_coords = [query_breaks[1], query_breaks[0]]
 	homol_seq = query_seq[query_breaks[1] - 1 : query_breaks[0]]
 	if aligns[0].strand == '-':
 	    homol_seq = reverse_complement(homol_seq)
@@ -184,7 +183,7 @@ def call_event(align1, align2, query_seq=None, no_sort=False, max_inv_target_ola
     return adj
 
     
-def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False, max_nodes=500, max_paths=5, max_ends=50, no_trim=[], same_target=None, from_edge=0.02, debug=False):
+def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False, max_nodes=500, max_paths=5, max_ends=50, no_trim=[], same_target=None, from_edge=0.3, debug=False):
     def _find_end_points():
 	starts = []
 	ends = []
@@ -201,14 +200,6 @@ def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False, ma
 		    ends.append(i)
 		except:
 		    ends = [i]
-		    	
-	for i in starts:
-	    if i in ends:
-		if aligns[i].qstart < aligns[i].query_len - aligns[i].qend + 1:
-		    ends.remove(i)
-		else:
-		    starts.remove(i)
-		break		    	
 		
 	return starts, ends
     
@@ -331,11 +322,10 @@ def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False, ma
 		overlapped = 0
 	    else:
 		overlapped = sum([len(olap) for olap in path_info[i]['overlaps']])
-		
+
 	    if best['index'] is None or\
 	       covered > best['covered'] or\
-	       overlapped < best['overlapped'] or\
-	       len(path_info[i]['chroms']) < len(path_info[best['index']]['chroms']):
+	       overlapped < best['overlapped']:
 		best['index'] = i
 		best['covered'] = covered
 		best['overlapped'] = overlapped
