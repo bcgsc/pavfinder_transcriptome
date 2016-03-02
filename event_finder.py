@@ -141,26 +141,33 @@ class EventFinder:
 	    
 	def process_split_aligns(aligns, query_seq, genes=None):
 	    adjs = find_chimera(aligns, query_seq=query_seq, debug=self.debug)
+
 	    adjs_filtered = []
 	    for adj in adjs:
 		self.update_adj(adj, aligns, query_seq, target_type, block_matches=block_matches)
 		if genes is not None:
 		    add_genes_from_event(genes, adj)
-		    
+
 		    if len(genes) > 1 and\
 		       external_mappings is not None and\
-		       external_mappings.has_key(adj.seq_id) and\
-		       external_mappings[adj.seq_id] and\
-		       len(external_mappings[adj.seq_id][0]) == 1:
-			print '%s chimera aborted mapped:%s external:%s' % (adj.seq_id,
-			                                                    genes,
-			                                                    external_mappings[adj.seq_id][0]
-			                                                    )
-			                                                      
-			continue
-		    
+		       external_mappings.has_key(adj.seq_id):
+			if len(external_mappings[adj.seq_id][0]) == 1:
+			    print '%s chimera mapped to single gene mapped:%s external:%s' % (adj.seq_id,
+			                                                                      genes,
+			                                                                      external_mappings[adj.seq_id][0]
+			                                                                      )
+			    continue
+
+			if not genes.intersection(external_mappings[adj.seq_id][0]):
+			    print '%s chimera not agreed mapped:%s external:%s' % (adj.seq_id,
+			                                                           genes,
+			                                                           external_mappings[adj.seq_id][0]
+			                                                           )
+			    continue
+
 		if filter_adj(adj):
 		    adjs_filtered.append(adj)
+
 	    return adjs_filtered
 	
 	def compile_mapping(mapping, align):
@@ -203,7 +210,6 @@ class EventFinder:
 	    print 'processing', query
 	    events = []
 	    query_seq = query_fasta.fetch(query)
-	    mappings_by_query[query] = {}
 	    genes = Set()
 
 	    aligns = []
@@ -245,7 +251,7 @@ class EventFinder:
 			if filter_adj(adj):
 			    events.append(adj)
 		elif len(tids) == 1 and not partially_aligned and self.exon_mapper.is_full_match(block_matches[list(tids)[0]]):
-		    print '%s:full_match' % query
+		    mappings_by_query[query] = genes, 'full'
 		    continue
 
 	    if partially_aligned:
@@ -387,7 +393,7 @@ class EventFinder:
     
 	    remove = Set()
 	    for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
-		alns = list(group)
+		eventst(group)
 		event = qname_to_event[query]
 
 		aln = alns[0]
@@ -407,9 +413,7 @@ class EventFinder:
 		    if aln.is_unmapped:
 			failed_reason = 'indel probe not mapped'
 			bad = True
-		    elif target != chrom:
-			failed_reason = 'indel probe align target(%s) != chrom(%s)' % (target, chrom)
-			bad = True
+
 		    elif size.isdigit() and int(size) <= indel_size_check:
 			if len(alns) > 1:
 			    failed_reason = 'chimeric probe aligns for simple indel'
@@ -547,8 +551,12 @@ class EventFinder:
 	    for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
 		seq_id, key, part = query.split(':')
 		event_type, chrom1, pos1, orient1, chrom2, pos2, orient2 = key.split('-')
+
+		if event_type in ('ins', 'del'):
+		    continue
+
 		alns = list(group)
-		    
+
 		# subseq multi-maps -> remove
 		full_mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
 		if len(full_mapped_alns) > 1:
@@ -668,14 +676,9 @@ class EventFinder:
 		adj.update_genome_breaks()
 		
 	if adj.transcripts:
-	    adj.update_exons()
-	    #if self.is_fusion(adj, (aligns[0].strand, aligns[1].strand), target_type) and target_type == 'transcripts':
-		#self.is_read_through(adj, (aligns[0].strand, aligns[1].strand))
-	    if adj.event != 'fusion' and adj.event != 'read_through':
-		if self.is_fusion(adj, (aligns[0].strand, aligns[1].strand), target_type) and target_type == 'transcripts':
-		    self.is_read_through(adj, (aligns[0].strand, aligns[1].strand))
-	    if adj.event in ('fusion', 'read_through') and adj.sense_fusion is None:
-		self.is_sense_fusion(adj, (aligns[0].strand, aligns[1].strand), target_type)
+	    adj.update_exons(target_type)
+	    if genes and len(genes) > 1:
+		self.is_fusion(adj, (aligns[0].strand, aligns[1].strand), target_type)
 		    
 	    self.update_feature(adj)
 	    fix_orients()
@@ -684,20 +687,22 @@ class EventFinder:
 	adj.set_probe(query_seq)
 	adj.size = adj.get_size()
 	
-	if adj.rearrangement == 'del':
-	    self.is_del_alt_splicing_event(adj)
-	    
-	if adj.rearrangement == 'dup' and\
-	   adj.transcripts and adj.exons is not None and\
-	   adj.exons[0] is not None and adj.exons[1] is not None:
-	    if adj.transcripts[0].gene == adj.transcripts[1].gene and\
-	       adj.transcripts[0].is_coding() and\
-	       not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
-	       not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
-		if abs(adj.exons[0] - adj.exons[1]) <= 1:
-		    adj.event = 'ITD'
-		else:
-		    adj.event = 'PTD'
+	# if event is already defined, don't need to modify
+	if adj.event is None:
+	    if adj.rearrangement == 'del':
+		self.is_del_alt_splicing_event(adj)
+
+	    if adj.rearrangement == 'dup' and\
+	       adj.transcripts and adj.exons is not None and\
+	       adj.exons[0] is not None and adj.exons[1] is not None:
+		if adj.transcripts[0].gene == adj.transcripts[1].gene and\
+		   adj.transcripts[0].is_coding() and\
+		   not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
+		   not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
+		    if abs(adj.exons[0] - adj.exons[1]) <= 1:
+			adj.event = 'ITD'
+		    else:
+			adj.event = 'PTD'
 			    
 	if (adj.event == 'None' or adj.event is None) and adj.rearrangement is not None:
 	    adj.event = adj.rearrangement
@@ -1024,11 +1029,8 @@ class EventFinder:
 	align_jobs = []
 	query_spans = {}
 	for align, block_matches, clipped_ends in partial_aligns:
-	    #query_seq = query_fasta.fetch(align.query)
 	    transcript = None
 	    target_seq = None
-	    #clipped_ends = extract_clipped_seq(query_seq, align.query_blocks)
-	    #new_aligns = []
 	    for pos, clipped_seq in clipped_ends.iteritems():
 		if len(clipped_seq) <= min_len:
 		    print '%s:skip partial because it is too short %s %d' % (align.query,
@@ -1041,12 +1043,10 @@ class EventFinder:
 		else:
 		    query_spans[align.query] = (align.query_len - len(clipped_seq) + 1, align.query_len)
 		
-		print 'partial11', align.query, pos, len(clipped_seq), clipped_seq, block_matches
 		if transcript is None:
 		    transcript = get_transcript(block_matches)
-		    #print 'partial22', transcript, transcript.id
 		    target_seq = transcript.get_sequence(self.genome_fasta)
-		#print 'partial33', align.query, len(target_seq)
+
 		if target_seq is not None:
 		    matches = search_by_regex(clipped_seq, target_seq)
 		    print 'partial44', align.query, matches
@@ -1088,79 +1088,93 @@ class EventFinder:
 		if op == 0:
 		    block_idx += 1
 		    continue
-		if (op == 1 or op == 2) and\
+		if (op == 1 or op == 2 or op == 3) and\
 		   i > 0 and i < len(align.sam.cigartuples) - 1 and\
 		   align.sam.cigartuples[i - 1][0] == 0 and\
 		   align.sam.cigartuples[i + 1][0] == 0:
 		    flanking_blocks.append((block_idx, block_idx + 1))
 	    return flanking_blocks
-		
+
+	def is_del_possibly_intron(target_breaks):
+	    motif = target_fasta.fetch(align.target, target_breaks[0], target_breaks[0] + 2) +\
+	          target_fasta.fetch(align.target, target_breaks[1] - 3, target_breaks[1] - 1)
+	    if motif.lower() == 'gtag' or motif.lower() == 'ctac':
+		return True
+	    else:
+		return False
+
 	adjs = []
 		
-	if re.search('[ID]\d+', align.cigarstring):
-	    for i, j in extract_flanking_blocks():		
-		target_breaks = (align.blocks[i][1], align.blocks[j][0])
-		target_gap = align.blocks[j][0] - align.blocks[i][1] - 1
-		if align.strand == '+':
-		    query_breaks = (align.query_blocks[i][1], align.query_blocks[j][0])
-		    query_gap = align.query_blocks[j][0] - align.query_blocks[i][1] - 1
-		else:
-		    query_breaks = (align.query_blocks[j][0], align.query_blocks[i][1])
-		    query_gap = align.query_blocks[i][1] - align.query_blocks[j][0] - 1
-		    
-		event_type = None
-		# del
-		if target_gap > 0 and query_gap == 0:
-		    event_type = 'del'
-		    
-		elif target_gap == 0 and query_gap > 0:
-		    event_type = 'ins'
-		    
-		elif target_gap > 0 and query_gap > 0:
-		    event_type = 'indel'
-		    
-		if event_type is None:
-		    continue
-		
-		if event_type in ('ins', 'del') and max(target_gap, query_gap) < min_size:
-		    if self.debug:
-			print '%s: filter out %s - size too small %d' % (align.query,
-			                                                 event_type,
-			                                                 max(target_gap, query_gap))
-		    continue
-		
-		adj = Adjacency(align.query,
-		                (align.target, align.target),
-		                query_breaks,
-		                target_breaks,
-		                rearrangement = event_type,
-		                orients = ('L', 'R')
-		                )
-		
-		if event_type == 'ins':
-		    ins_seq = query_fasta.fetch(align.query, query_breaks[0], query_breaks[1] - 1)
-		    if align.strand == '-':
-			ins_seq = reverse_complement(ins_seq)
-		    adj.ins_seq = ins_seq
-		    if not self.is_repeat_number_change(adj,
-		                                        query_fasta, 
-		                                        target_fasta,
-		                                        align.strand):
-			self.is_duplication(adj,
-			                    query_fasta.fetch(align.query),
-			                    target_fasta,
-			                    align.strand)
-			
-		if event_type == 'del':
-		    self.is_repeat_number_change(adj,
-		                                 query_fasta, 
-		                                 target_fasta,
-		                                 align.strand)
-    
-		if no_indels and adj.rearrangement in ('ins', 'del'):
-		    continue
+	if not re.search('[IDN]\d+', align.cigarstring):
+	    return adjs
 
-		adjs.append(adj)
+	for i, j in extract_flanking_blocks():
+	    target_breaks = (align.blocks[i][1], align.blocks[j][0])
+	    target_gap = align.blocks[j][0] - align.blocks[i][1] - 1
+	    if align.strand == '+':
+		query_breaks = (align.query_blocks[i][1], align.query_blocks[j][0])
+		query_gap = align.query_blocks[j][0] - align.query_blocks[i][1] - 1
+	    else:
+		query_breaks = (align.query_blocks[j][0], align.query_blocks[i][1])
+		query_gap = align.query_blocks[i][1] - align.query_blocks[j][0] - 1
+		
+	    event_type = None
+	    # del
+	    if target_gap > 0 and query_gap == 0:
+		event_type = 'del'
+		
+	    elif target_gap == 0 and query_gap > 0:
+		event_type = 'ins'
+
+	    elif target_gap > 0 and query_gap > 0:
+		event_type = 'indel'
+		
+	    if event_type is None:
+		continue
+
+	    if target_type == 'genome' and event_type == 'del' and is_del_possibly_intron(target_breaks):
+		continue
+
+	    if event_type in ('ins', 'del') and max(target_gap, query_gap) < min_size:
+		if self.debug:
+		    print '%s: filter out %s - size too small %d' % (align.query,
+		                                                     event_type,
+		                                                     max(target_gap, query_gap))
+		continue
+
+	    adj = Adjacency(align.query,
+	                    (align.target, align.target),
+	                    query_breaks,
+	                    target_breaks,
+	                    rearrangement = event_type,
+	                    orients = ('L', 'R')
+	                    )
+
+	    if event_type == 'ins':
+		ins_seq = query_fasta.fetch(align.query, query_breaks[0], query_breaks[1] - 1)
+		if align.strand == '-':
+		    ins_seq = reverse_complement(ins_seq)
+		adj.ins_seq = ins_seq
+		if not self.is_repeat_number_change(adj,
+	                                            query_fasta, 
+	                                            target_fasta,
+	                                            align.strand):
+		    if len(ins_seq) >= 10:
+			self.is_duplication(adj,
+		                            query_fasta.fetch(align.query),
+		                            target_fasta,
+		                            align.strand)
+
+	    if event_type == 'del':
+		self.is_repeat_number_change(adj,
+	                                     query_fasta,
+	                                     target_fasta,
+	                                     align.strand)
+
+	    if no_indels and adj.rearrangement in ('ins', 'del'):
+		continue
+
+	    adjs.append(adj)
 
 	return adjs
     
@@ -1255,7 +1269,6 @@ class EventFinder:
 		i = 1
 		j = 3
 		while same and i < len(aa):
-		    #print 'tttccc', i, aa[i], repeat, repeat_nt, nt[j:j+3]
 		    if aa[i] == repeat[0] and nt[j:j+3] == repeat_nt[:3]:
 			repeat += aa[i]
 			repeat_nt += nt[j:j+3]
@@ -1270,7 +1283,6 @@ class EventFinder:
 		i = len(aa) - 2
 		j = len(nt) - 6
 		while same and i >= 0:
-		    #print 'tttbbb', i, aa[i], repeat, repeat_nt, nt[j:j+3]
 		    if aa[i] == repeat[0] and nt[j:j+3] == repeat_nt[:3]:
 			repeat += aa[i]
 			repeat_nt += nt[j:j+3] 
@@ -1313,16 +1325,8 @@ class EventFinder:
 		if adj.genome_breaks[1] - adj.genome_breaks[0] < 4:
 		    aa_pos -= 1
 		cds_pos_converted = adj.transcripts[0].aa_coord_to_txt_coord(aa_pos)[1]
-		    
-		#print 'ccc', mid_genome_break, cds_pos, aa_pos, cds_pos_converted
-		#print 'ccc2', aa[:aa_pos]
-		#print 'ccc2a', aa[aa_pos:], len(aa), len(aa[:aa_pos]), len(aa[aa_pos - 1:])
-		#print 'ccc3', cds[:cds_pos_converted]
-		#print 'ccc3a', cds[cds_pos_converted:], len(cds), len(cds[:cds_pos_converted]), len(cds[cds_pos_converted:])
 		repeat_down, repeat_down_nt = get_aa_repeat(aa[aa_pos:], cds[cds_pos_converted:], start=True)
 		repeat_up, repeat_up_nt = get_aa_repeat(aa[:aa_pos], cds[:cds_pos_converted], end=True)
-		#print 'ccc4', repeat_down, repeat_down_nt
-		#print 'ccc5', repeat_up, repeat_up_nt
 
 		# identify amino acid repeat start and end
 		repeat_start = None
@@ -1356,10 +1360,6 @@ class EventFinder:
 			repeat_end = aa_pos
 			repeat_spans.append((repeat_start, repeat_end))
 
-		    #print 'kk', repeat_start, repeat_end, repeat_down, repeat_up, repeat_down_nt, repeat_up_nt, len(aa)
-		    #print 'kk2', aa[repeat_start - 1:repeat_end], len(aa[repeat_start - 1:repeat_end])
-		    #print 'kk2', aa[:repeat_start],len(aa[:repeat_start])
-		    #print 'kk2', aa[repeat_end:],len(aa[repeat_end:])
 		    return repeat_spans
 
 	    return []
@@ -1390,8 +1390,6 @@ class EventFinder:
 		    break_start = repeat_start - 1
 		new_seq = construct_seq(adj.chroms[0],
 		                        (repeat_start, repeat_end),
-		                        #break_start = repeat_start - 1,
-		                        #break_start = repeat_end,
 		                        break_start = break_start,
 		                        repeat_seq = repeat_seq * copy_num_change,
 		                        add = True)
@@ -1412,19 +1410,14 @@ class EventFinder:
 		    break_end = repeat_start + adj.size - 1
 		new_seq = construct_seq(adj.chroms[0],
 	                                (repeat_start, repeat_end),
-	                                #break_start = repeat_start,
-	                                #break_end = repeat_start + len(repeat_seq) - 1,
 		                        break_start = break_start,
 		                        break_end = break_end,
 	                                minus = True)
-		#print 'old', adj.genome_breaks[0] + 1, adj.genome_breaks[1] - 1, repeat_start, repeat_end, old_seq
-		#print 'new', repeat_start, repeat_start + len(repeat_seq) - 1, new_seq, old_seq.lower() == new_seq.lower()
 		if old_seq.lower() == new_seq.lower():
 		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_end), (copy_num_ref, copy_num_ref - copy_num_change))
 	    return None
 
 	aa_repeat_spans = identify_aa_repeat()
-	#print 'eef', aa_repeat_spans
 	for aa_repeat_span in aa_repeat_spans:
 	    shift_result = shift_coord(aa_repeat_span[0], aa_repeat_span[1])
 	    if shift_result is not None:
@@ -1460,13 +1453,9 @@ class EventFinder:
 		if direction == '+':
 		    start = pos - 1
 		    end = pos - 1 + len(repeat)
-		    #next_copy = target_fasta.fetch(target, pos - 1, pos - 1 + len(repeat))
-		    #tmp = target_fasta.fetch(target, pos - 1, pos - 1 + 20)
 		else:
 		    start = pos - len(repeat)
 		    end = pos
-		    #next_copy = target_fasta.fetch(target, pos - len(repeat), pos)
-		    #tmp = target_fasta.fetch(target, pos - 20, pos)
     
 		next_copy = target_fasta.fetch(target, start, end)
 		if next_copy.lower() == repeat.lower():
@@ -1499,7 +1488,6 @@ class EventFinder:
 		copy_num_downstream = get_copy_num(adj.targets[0], target_breaks_sorted[1], repeat, '+')
 
 		if copy_num_upstream > 0 or copy_num_downstream > 0:
-		    #adj.in_frame = True
 		    original_copy_num = copy_num_upstream +  copy_num_downstream
     
 		    # just a plain duplication or deletion
@@ -1528,10 +1516,19 @@ class EventFinder:
 		    return True
 
 	return False
-    
+
     def is_fusion(self, adj, align_strands, target_type):
 	if adj.transcripts[0].gene != adj.transcripts[1].gene:
 	    adj.event = 'fusion'
+
+	    # if there is homol sequence, and one or both
+	    # of both breakpoints is not exon_bound, can we adjust
+	    # breakpoint to make it exon_bound
+	    if target_type == 'transcripts' and\
+	       adj.homol_seq and\
+	       (not adj.exon_bounds[0] or not adj.exon_bounds[1]):
+		adj.adjust_transcript_breaks(align_strands)
+
 	    self.is_sense_fusion(adj, align_strands, target_type)
 	    return True
 	return False
@@ -1539,92 +1536,67 @@ class EventFinder:
     def is_sense_fusion(self, adj, align_strands, target_type):
 	def reverse_tuple(tup):
 	    return tuple(list(tup)[::-1])
+
+	def set_orients(reverse=False):
+	    if not reverse:
+		adj.upstream_transcript = adj.transcripts[0]
+		adj.downstream_transcript = adj.transcripts[1]
+		adj.exons_oriented = adj.exons
+		adj.exon_bounds_oriented = adj.exon_bounds
+	    else:
+		adj.upstream_transcript = adj.transcripts[1]
+		adj.downstream_transcript = adj.transcripts[0]
+		adj.exons_oriented = reverse_tuple(adj.exons)
+		adj.exon_bounds_oriented = reverse_tuple(adj.exon_bounds)
+
 	sense = None
 	if (adj.event == 'fusion' or adj.event == 'read_through'):
 	    if target_type == 'genome':
 		sense = False
-		if adj.transcripts[0].strand == '+' and adj.transcripts[1].strand == '+' and\
+		if adj.transcripts[0].strand == adj.transcripts[1].strand and\
 		   align_strands[0] == align_strands[1]:
 		    sense = True
 		    if align_strands[0] == '+':
-			adj.upstream_transcript = adj.transcripts[0]
-			adj.downstream_transcript = adj.transcripts[1]
-			adj.exons_oriented = adj.exons
-			adj.exon_bounds_oriented = adj.exons
+			set_orients(reverse=False)
 		    else:
-			adj.upstream_transcript = adj.transcripts[1]
-			adj.downstream_transcript = adj.transcripts[0]
-			adj.exons_oriented = reverse_tuple(adj.exons)
-			adj.exon_bounds_oriented = reverse_tuple(adj.exon_bounds)
-		elif adj.transcripts[0].strand == '-' and adj.transcripts[1].strand == '-' and\
-		     align_strands[0] == align_strands[1]:
-		    sense = True
-		    if align_strands[0] == '-':
-			adj.upstream_transcript = adj.transcripts[0]
-			adj.downstream_transcript = adj.transcripts[1]
-			adj.exons_oriented = adj.exons
-			adj.exon_bounds_oriented = adj.exons
-		    else:
-			adj.upstream_transcript = adj.transcripts[1]
-			adj.downstream_transcript = adj.transcripts[0]
-			adj.exons_oriented = reverse_tuple(adj.exons)
-			adj.exon_bounds_oriented = reverse_tuple(adj.exon_bounds)
-		elif adj.transcripts[0].strand == '+' and adj.transcripts[1].strand == '-' and\
+			set_orients(reverse=True)
+
+		elif adj.transcripts[0].strand != adj.transcripts[1].strand and\
 		     align_strands[0] != align_strands[1]:
 		    sense = True
-		    if align_strands[0] == '+':
-			adj.upstream_transcript = adj.transcripts[0]
-			adj.downstream_transcript = adj.transcripts[1]
-			adj.exons_oriented = adj.exons
-			adj.exon_bounds_oriented = adj.exons
+		    if align_strands[0] == adj.transcripts[0].strand:
+			set_orients(reverse=False)
 		    else:
-			adj.upstream_transcript = adj.transcripts[1]
-			adj.downstream_transcript = adj.transcripts[0]
-			adj.exons_oriented = reverse_tuple(adj.exons)
-			adj.exon_bounds_oriented = reverse_tuple(adj.exon_bounds)
-			
-		elif adj.transcripts[0].strand == '-' and adj.transcripts[1].strand == '+' and\
-		     align_strands[0] != align_strands[1]:
-		    sense = True
-		    if align_strands[0] == '-':
-			adj.upstream_transcript = adj.transcripts[0]
-			adj.downstream_transcript = adj.transcripts[1]
-			adj.exons_oriented = adj.exons
-			adj.exon_bounds_oriented = adj.exons
-		    else:
-			adj.upstream_transcript = adj.transcripts[1]
-			adj.downstream_transcript = adj.transcripts[0]
-			adj.exons_oriented = reverse_tuple(adj.exons)
-			adj.exon_bounds_oriented = reverse_tuple(adj.exon_bounds)
+			set_orients(reverse=True)
 			
 	    elif target_type == 'transcripts':
 		sense = False
 		if align_strands[0] == align_strands[1]:
 		    sense = True
 		    if align_strands[0] == '+':
-			adj.upstream_transcript = adj.transcripts[0]
-			adj.downstream_transcript = adj.transcripts[1]
-		    elif align_strands[1] == '-':
-			adj.upstream_transcript = adj.transcripts[1]
-			adj.downstream_transcript = adj.transcripts[0]
-		
+			set_orients(reverse=False)
+		    else:
+			set_orients(reverse=True)
+
 	    # does not allow downstream breakpoint to be at utr when upstream isn't
 	    within_utrs = (adj.transcripts[0].within_utr(adj.genome_breaks[0]),
 	                   adj.transcripts[1].within_utr(adj.genome_breaks[1]))
 	    
 	adj.sense_fusion = sense
 	
-    def is_read_through(self, adj, align_strands):
-	if adj.chroms[0] == adj.chroms[1] and\
-	   adj.event == 'fusion' and\
-	   adj.upstream_transcript and adj.downstream_transcript and\
-	   adj.upstream_transcript.gene != adj.downstream_transcript.gene and\
-	   adj.upstream_transcript.strand == adj.downstream_transcript.strand and\
-	   adj.exon_bounds[0] and adj.exon_bounds[1] and\
-	   align_strands[0] == align_strands[1]:
-	    adj.event = 'read_through'
-	    return True
-	return False
+    #def is_read_through(self, adj, align_strands):
+	#if adj.chroms[0] == adj.chroms[1] and\
+	   #adj.event == 'fusion' and\
+	   #adj.upstream_transcript and adj.downstream_transcript and\
+	   #adj.upstream_transcript.gene != adj.downstream_transcript.gene and\
+	   #adj.upstream_transcript.strand == adj.downstream_transcript.strand and\
+	   #((adj.upstream_transcript.strand == '+' and adj.upstream_transcript.exons[0][0] < adj.downstream_transcript.exons[0][0]) or\
+	    #(adj.upstream_transcript.strand == '-' and adj.upstream_transcript.exons[-1][1] > adj.downstream_transcript.exons[-1][1])) and\
+	   #adj.exon_bounds[0] and adj.exon_bounds[1] and\
+	   #align_strands[0] == align_strands[1]:    
+	    #adj.event = 'read_through'
+	    #return True
+	#return False
     
     def is_read_through_from_single_align(self, block_matches, align):
 	def check_matches(matches, index, before=False, after=False):
