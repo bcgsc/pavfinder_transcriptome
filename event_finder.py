@@ -1530,6 +1530,10 @@ class EventFinder:
 		adj.adjust_transcript_breaks(align_strands)
 
 	    self.is_sense_fusion(adj, align_strands, target_type)
+
+	    if adj.sense_fusion and adj.chroms[0] == adj.chroms[1]:
+		self.is_fusion_read_through(adj)
+
 	    return True
 	return False
 	    
@@ -1581,22 +1585,67 @@ class EventFinder:
 	    # does not allow downstream breakpoint to be at utr when upstream isn't
 	    within_utrs = (adj.transcripts[0].within_utr(adj.genome_breaks[0]),
 	                   adj.transcripts[1].within_utr(adj.genome_breaks[1]))
-	    
+
 	adj.sense_fusion = sense
+
+    def is_fusion_read_through(self, adj):
+	"""Check if fusion event is read_through
+
+	   Criteria:
+	   1. sense fusion on same chromosome
+	   2a. the 2 genes overlap
+	   2b. there is no coding gene on the same strand between the 2 genes
+	"""
+	if adj.chroms[0] != adj.chroms[1] or adj.transcripts[0].strand != adj.transcripts[1].strand:
+	    return
+
+	# find interval between genes
+	interval = adj.transcripts[0].exons[-1][1] + 1, adj.transcripts[1].exons[0][0] - 1
+	if adj.transcripts[0].strand == '+':
+	    if adj.transcripts[0].exons[0][0] < adj.transcripts[1].exons[0][0]:
+		transcripts = adj.transcripts
+	    else:
+		transcripts = adj.transcripts[::-1]
+	    interval = transcripts[0].exons[-1][1] + 1, transcripts[1].exons[0][0] - 1
+	if adj.transcripts[0].strand == '-':
+	    if adj.transcripts[0].exons[-1][1] > adj.transcripts[1].exons[-1][1]:
+		transcripts = adj.transcripts
+	    else:
+		transcripts = adj.transcripts[::-1]
+	    interval = transcripts[1].exons[-1][1] + 1, transcripts[0].exons[0][0] - 1
 	
-    #def is_read_through(self, adj, align_strands):
-	#if adj.chroms[0] == adj.chroms[1] and\
-	   #adj.event == 'fusion' and\
-	   #adj.upstream_transcript and adj.downstream_transcript and\
-	   #adj.upstream_transcript.gene != adj.downstream_transcript.gene and\
-	   #adj.upstream_transcript.strand == adj.downstream_transcript.strand and\
-	   #((adj.upstream_transcript.strand == '+' and adj.upstream_transcript.exons[0][0] < adj.downstream_transcript.exons[0][0]) or\
-	    #(adj.upstream_transcript.strand == '-' and adj.upstream_transcript.exons[-1][1] > adj.downstream_transcript.exons[-1][1])) and\
-	   #adj.exon_bounds[0] and adj.exon_bounds[1] and\
-	   #align_strands[0] == align_strands[1]:    
-	    #adj.event = 'read_through'
-	    #return True
-	#return False
+	# if gene1 and gene2 overlaps
+	if not interval[0] < interval[1]:
+	    adj.event = 'read_through'
+
+	# check if there is any coding gene on same strand within interval
+	else:
+	    genes_in_between = Set()
+	    gene_previous = None
+	    for feature in self.annot.fetch(adj.chroms[0], interval[0], interval[1]):
+		if not 'exon' in str(feature):
+		    continue
+
+		match = re.search(r'transcript_id "(\S+)"', str(feature))
+		if match:
+		    transcript_id = match.group(1)
+		    transcript = self.transcripts_dict[transcript_id]
+		    if gene_previous is not None:
+			if transcript.gene == gene_previous:
+			    continue
+		    else:
+			gene_previous = transcript.gene
+		    if transcript.gene != adj.transcripts[0].gene and\
+		       transcript.gene != adj.transcripts[1].gene and\
+		       transcript.strand == adj.transcripts[0].strand and\
+		       transcript.is_coding() and\
+		       transcript.exons[0][0] > interval[0] and\
+		       transcript.exons[-1][1] < interval[1]:
+			genes_in_between.add(transcript.gene)
+			break
+
+	    if not genes_in_between:
+		adj.event = 'read_through'
     
     def is_read_through_from_single_align(self, block_matches, align):
 	def check_matches(matches, index, before=False, after=False):
