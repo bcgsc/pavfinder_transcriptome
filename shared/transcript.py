@@ -99,12 +99,7 @@ class Transcript:
 		    elif self.cds_start >= exon[0] and self.cds_start <= exon[1]:
 			utr5 += exon[1] - self.cds_start
 			break
-	    print 'ggg', aa_coord, cds_coords, utr5
 	    txt_coords = utr5 + cds_coords[0], utr5 + cds_coords[1]
-	    print 'gggtxt_coords', txt_coords
-	    #print 'gggc', cdna_seq[txt_coords[0]-1:txt_coords[1]+3]
-	    #print 'gggc', cdna_seq[txt_coords[0]-4:txt_coords[1]+3]
-	    print 'ggg2', txt_coords[0], self.txt_coord_to_genome_coord(txt_coords[0])
 	    return self.txt_coord_to_genome_coord(txt_coords[0]),\
 	           self.txt_coord_to_genome_coord(txt_coords[1])
 	return None
