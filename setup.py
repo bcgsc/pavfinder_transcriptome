@@ -1,12 +1,12 @@
 import os
 from setuptools import setup, find_packages
-execfile(os.path.dirname(os.path.realpath(__file__)) + "/pavfinder-transcriptome/version.py")
+execfile(os.path.dirname(os.path.realpath(__file__)) + "/pavfinder_transcriptome/version.py")
 setup(
-    name='pavfinder-transcriptome',
+    name='pavfinder_transcriptome',
     version=__version__,
     description='Post Assembly Variant Finder - transcriptome',
     long_description='Identifies transcriptomic structural variants from sequence assembly',
-    url='https://github.com/bcgsc/pavfinder-pavfinder.git',
+    url='https://github.com/bcgsc/pavfinder_transcriptome.git',
     author='Readman Chiu',
     author_email='rchiu@bcgsc.ca',
     license='BCCA',
@@ -22,6 +22,6 @@ setup(
         'pybedtools>=0.6.2',
         'intspan>=0.701',
         ],
-    scripts = ['pavfinder-transcriptome/scripts/find_events.py',
+    scripts = ['pavfinder_transcriptome/scripts/find_events.py',
                ],
 )
