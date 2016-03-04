@@ -18,7 +18,6 @@ setup(
         ],
     packages=find_packages(),
     install_requires = [
-        'cython==0.21.2',
         'pysam==0.8.2.1',
         'pybedtools==0.6.2',
         'intspan>=0.701',
