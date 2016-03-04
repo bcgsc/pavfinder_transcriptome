@@ -18,4 +18,4 @@ Install pavfinder-transcriptome:
    $ virtualenv <DIR>
    $ source <DIR>/bin/activate
    $ pip install -U cython
-   $ pip install git+https://github.com/bcgsc/pavfinder-transcriptome.git#egg=pavfinder-transcriptome
+   $ pip install git+https://github.com/bcgsc/pavfinder_transcriptome.git#egg=pavfinder_transcriptome
