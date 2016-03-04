@@ -3,10 +3,10 @@ import os
 import pysam
 from sets import Set
 import pavfinder_transcriptome as pvt
-#from pavfinder-transcriptome.transcript import Transcript
-#from pavfinder-transcriptome.event_finder import EventFinder
-#from adjacency import Adjacency
-#from read_support import find_support
+from pvt.transcript import Transcript
+from pvt.event_finder import EventFinder
+from pvt.adjacency import Adjacency
+from pvt.read_support import find_support
 
 def combine_events(events, mappings):
     """Combine events via genome and transcripts alignment on contig level"""
@@ -156,10 +156,10 @@ def main():
     query_fasta = create_pysam_fasta(args.query_fasta)
     genome_fasta = create_pysam_fasta(args.genome_fasta)
     transcripts_fasta = create_pysam_fasta(args.transcripts_fasta)
-    transcripts_dict = pvt.Transcript.extract_transcripts(args.gtf)
+    transcripts_dict = Transcript.extract_transcripts(args.gtf)
     annot_tabix = create_pysam_tabix(args.gtf)
             
-    ef = pvt.EventFinder(genome_fasta, annot_tabix, transcripts_dict, args.outdir, debug=args.debug)
+    ef = EventFinder(genome_fasta, annot_tabix, transcripts_dict, args.outdir, debug=args.debug)
     events = {'via_genome': {}, 'via_transcripts': {}}
     mappings = {'via_genome': {}, 'via_transcripts': {}}
     gene_hits = None
@@ -192,7 +192,7 @@ def main():
                                                                                 )        
 
     events_combined = combine_events(events, mappings)
-    events_merged = pvt.Adjacency.merge(events_combined)
+    events_merged = Adjacency.merge(events_combined)
     
     if events_merged and args.genome_index and len(args.genome_index) == 2:
         ef.filter_probes(events_merged, args.genome_index[0], args.genome_index[1], args.outdir, debug=args.debug)
@@ -200,7 +200,7 @@ def main():
                           subseq_len=args.subseq_len, debug=args.debug)
 
     if args.r2c:
-        pvt.read_support.find_support(events_merged, args.r2c, args.query_fasta, num_procs=args.nproc, debug=args.debug)
+        find_support(events_merged, args.r2c, args.query_fasta, num_procs=args.nproc, debug=args.debug)
         events_filtered = [event for event in events_merged if event.support >= args.min_support]
     else:
         events_filtered = events_merged
