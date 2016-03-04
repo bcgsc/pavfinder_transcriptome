@@ -2,11 +2,10 @@ import argparse
 import os
 import pysam
 from sets import Set
-import pavfinder_transcriptome as pvt
-from pvt.transcript import Transcript
-from pvt.event_finder import EventFinder
-from pvt.adjacency import Adjacency
-from pvt.read_support import find_support
+from pavfinder_transcriptome.transcript import Transcript
+from pavfinder_transcriptome.event_finder import EventFinder
+from pavfinder_transcriptome.adjacency import Adjacency
+from pavfinder_transcriptome.read_support import find_support
 
 def combine_events(events, mappings):
     """Combine events via genome and transcripts alignment on contig level"""
