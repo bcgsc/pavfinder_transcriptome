@@ -23,6 +23,7 @@ setup(
         'intspan>=0.701',
         'numpy',
         'pandas',
+        'biopython',
         ],
     scripts = ['pavfinder_transcriptome/scripts/find_events.py',
                ],
