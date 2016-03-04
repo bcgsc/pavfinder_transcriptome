@@ -1,6 +1,7 @@
 import re
 import sys
 import os
+import glob
 from sets import Set
 from operator import itemgetter
 import collections
@@ -393,7 +394,7 @@ class EventFinder:
     
 	    remove = Set()
 	    for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
-		eventst(group)
+		alns = list(group)
 		event = qname_to_event[query]
 
 		aln = alns[0]
@@ -485,6 +486,11 @@ class EventFinder:
 	    bam = run_align(query_fa_file)
 	    parse_and_filter(bam, query_fa_file, qname_to_event)
 	    
+	    if not debug:
+		os.remove(bam.filename)
+		for ff in glob.glob(query_fa_file + '*'):
+		    os.remove(ff)
+
     @classmethod
     def filter_subseqs(cls, events, query_fa, genome_index_dir, genome_index, working_dir, subseq_len=50, debug=False):
 	def create_query_fasta(events, fa_file, min_size=20):
@@ -601,7 +607,6 @@ class EventFinder:
 				print '%s: remove %s - subseq fully_mapped to another region' % (seq_id,
 				                                                                 events[i].key())
 				break
-	    
 			
 	    for i in sorted(list(remove), reverse=True):
 		del events[i]
@@ -611,6 +616,10 @@ class EventFinder:
 	if count > 0:
 	    bam = run_align(query_fa_file)
 	    parse_and_filter(bam)
+
+	    if not debug:
+		os.remove(bam.filename)
+		os.remove(query_fa_file)
 	
     def update_adj(self, adj, aligns, query_seq, target_type, block_matches=None):
 	def fix_orients():
@@ -989,9 +998,7 @@ class EventFinder:
 			new_aligns[query] = align
 	    return new_aligns
 	
-	def run_align(jobs):
-	    query_fa_file = '%s/partial_query.fa' % self.working_dir
-	    target_fa_file = '%s/partial_target.fa' % self.working_dir
+	def run_align(jobs, query_fa_file, target_fa_file):
 	    query_fa = open(query_fa_file, 'w')
 	    target_fa = open(target_fa_file, 'w')
 	    target_seqs = {}
@@ -1049,7 +1056,6 @@ class EventFinder:
 
 		if target_seq is not None:
 		    matches = search_by_regex(clipped_seq, target_seq)
-		    print 'partial44', align.query, matches
 		    if matches and len(matches) == 1:
 			match = matches[0]
 			if target_type == 'genome':
@@ -1068,7 +1074,9 @@ class EventFinder:
 			query_target[align.query] = transcript.id
 				    
 	if align_jobs:
-	    partial_bam = run_align(align_jobs)
+	    query_fa_file = '%s/partial_query.fa' % self.working_dir
+	    target_fa_file = '%s/partial_target.fa' % self.working_dir
+	    partial_bam = run_align(align_jobs, query_fa_file, target_fa_file)
 	    if partial_bam is not None:
 		original_aligns = dict((job[0].query, job[0]) for job in align_jobs)
 		new_aligns = parse_partial_aligns(partial_bam, query_target, query_spans)
@@ -1076,6 +1084,12 @@ class EventFinder:
 		for query, align in new_aligns.iteritems():
 		    new_multi_aligns[query] = [original_aligns[query]]
 		    new_multi_aligns[query].append(align)
+
+		if not self.debug:
+		    os.remove(partial_bam.filename)
+		    os.remove(query_fa_file)
+		    for ff in glob.glob(target_fa_file + '*'):
+			os.remove(ff)
 		
 	return new_multi_aligns
     
