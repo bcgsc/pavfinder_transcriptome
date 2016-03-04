@@ -21,6 +21,7 @@ setup(
         'pysam>=0.8.1',
         'pybedtools>=0.6.2',
         'intspan>=0.701',
+        'numpy',
         ],
     scripts = ['pavfinder_transcriptome/scripts/find_events.py',
                ],
