@@ -10,7 +10,7 @@ Install the following softwares and put there executables in ``PATH``:
 -  `GMAP 2014-12-28
    <http://research-pub.gene.com/gmap/src/gmap-gsnap-2014-01-21.tar.gz>`_
 
-Install pavfinder-transcriptome:
+Install pavfinder_transcriptome:
 
 ::
 

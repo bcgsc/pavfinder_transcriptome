@@ -1,1 +1,1 @@
-# pavfinder-transcriptome
+# pavfinder_transcriptome
