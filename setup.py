@@ -1,7 +1,7 @@
 import os
 from setuptools import setup, find_packages
 from pavfinder_transcriptome import __version__
-#execfile(os.path.dirname(os.path.realpath(__file__)) + "/pavfinder_transcriptome/version.py")
+
 setup(
     name='pavfinder_transcriptome',
     version=__version__,
