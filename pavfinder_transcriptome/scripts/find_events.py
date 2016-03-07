@@ -1,7 +1,10 @@
 import argparse
 import os
+import datetime
 import pysam
+import sys
 from sets import Set
+import pavfinder_transcriptome as pvt
 from pavfinder_transcriptome.transcript import Transcript
 from pavfinder_transcriptome.event_finder import EventFinder
 from pavfinder_transcriptome.adjacency import Adjacency
@@ -120,6 +123,7 @@ def parse_args():
     parser.add_argument("--nproc", type=int, help="number of processes. Default:4", default=4)
     parser.add_argument("--genome_index", type=str, help="genome index path and name", nargs=2)
     parser.add_argument("--sort_by_coord", action="store_true", help="sort output by genome coordinates")
+    parser.add_argument("--version", action='version', version='%s %s' % (pvt.__name__, pvt.__version__))
     filtering = parser.add_argument_group('filtering')
     filtering.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
     filtering.add_argument("--min_indel_size", type=int, help="minimum indel size. Default:3", default=3)
@@ -190,23 +194,33 @@ def main():
                                                                                 only_exon_bound_fusion=not args.include_non_exon_bound_fusion
                                                                                 )        
 
+    # combine events from genome and transcriptome alignments
     events_combined = combine_events(events, mappings)
+
+    # merge identical events from different contigs
     events_merged = Adjacency.merge(events_combined)
     
+    # filter by checking probe and subseq alignments
     if events_merged and args.genome_index and len(args.genome_index) == 2:
         ef.filter_probes(events_merged, args.genome_index[0], args.genome_index[1], args.outdir, debug=args.debug)
         ef.filter_subseqs(events_merged, query_fasta, args.genome_index[0], args.genome_index[1], args.outdir,
                           subseq_len=args.subseq_len, debug=args.debug)
 
+    # read support
     if args.r2c:
         find_support(events_merged, args.r2c, args.query_fasta, num_procs=args.nproc, debug=args.debug)
         events_filtered = [event for event in events_merged if event.support >= args.min_support]
     else:
         events_filtered = events_merged
-        
+
+    # determine if events are in- or out-of-frame
     ef.set_frame(events_filtered, query_fasta, genome_fasta)
 
-    Adjacency.report_events(events_filtered, '%s/events.bedpe' % args.outdir, sort_by_coord=args.sort_by_coord)
+    # report (with meta data)
+    cmd = ' '.join(sys.argv)
+    time = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+    software = '%s %s' % (pvt.__name__, pvt.__version__)
+    Adjacency.report_events(events_filtered, '%s/events.bedpe' % args.outdir, sort_by_coord=args.sort_by_coord, header=(software, '%s %s' % (time, cmd)))
 
 main()
     
