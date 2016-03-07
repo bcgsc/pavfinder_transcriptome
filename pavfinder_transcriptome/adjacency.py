@@ -455,7 +455,7 @@ class Adjacency:
 	return '\t'.join(data)
 
     @classmethod
-    def report_events(cls, events, outfile, sort_by_coord=False):
+    def report_events(cls, events, outfile, sort_by_coord=False, header=None):
 	def compare_event(e1, e2):
 	    cmp_coord_result = cls.cmp_genome_coords((e1.chroms[0], e1.genome_breaks[0], e1.genome_breaks[1]),
 	                                             (e2.chroms[0], e2.genome_breaks[0], e2.genome_breaks[1]))
@@ -477,7 +477,12 @@ class Adjacency:
 	    return 0
 
 	out = open(outfile, 'w')
-	#out.write('%s\n' % '\t'.join(cls.report_items.keys()))
+	if header is not None:
+	    if type(header) is str:
+		out.write('#%s\n' % header)
+	    elif type(header) is tuple or type(header) is list:
+		for h in header:
+		    out.write('#%s\n' % h)
 	out.write('#%s\n' % '\t'.join(cls.bedpe_items.keys()))
 	
 	if not sort_by_coord:
