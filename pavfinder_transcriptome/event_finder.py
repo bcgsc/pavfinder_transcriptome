@@ -708,10 +708,10 @@ class EventFinder:
 		   adj.transcripts[0].is_coding() and\
 		   not adj.transcripts[0].within_utr(adj.genome_breaks[0]) and\
 		   not adj.transcripts[0].within_utr(adj.genome_breaks[1]):
-		    if abs(adj.exons[0] - adj.exons[1]) <= 1:
-			adj.event = 'ITD'
-		    else:
+		    if adj.exon_bounds[0] and adj.exon_bounds[1]:
 			adj.event = 'PTD'
+		    else:
+			adj.event = 'ITD'
 			    
 	if (adj.event == 'None' or adj.event is None) and adj.rearrangement is not None:
 	    adj.event = adj.rearrangement
