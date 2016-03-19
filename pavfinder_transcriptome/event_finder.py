@@ -598,6 +598,10 @@ class EventFinder:
 	    for seq_id in events_by_query.keys():
 		if subseq_mappings.has_key(seq_id):
 		    for i in events_by_query[seq_id]:
+			# subseq will map to more than 1 region in dup events
+			event_type = events[i].key().split('-')[0]
+			if event_type in ('dup', 'ITD', 'PTD'):
+			    continue
 			if subseq_mappings[seq_id].has_key(events[i].key()):	    
 			    if subseq_mappings[seq_id][events[i].key()].has_key('0') and\
 			       subseq_mappings[seq_id][events[i].key()].has_key('1') and\
