@@ -145,6 +145,14 @@ class EventFinder:
 
 	    adjs_filtered = []
 	    for adj in adjs:
+		# filtering out event if sequences overlap too much
+		# otherwise is_fusion() will try to "adjust" exon_bounds to make it pass
+		if type(adj.homol_seq) is str and len(adj.homol_seq) > max_homol_len:
+		    print '%s: filter out %s - %s_seq %s too long' % (adj.seq_id,
+		                                                      adj.rearrangement,
+		                                                      adj.homol_seq,
+		                                                      len(adj.homol_seq))
+		    continue
 		self.update_adj(adj, aligns, query_seq, target_type, block_matches=block_matches)
 		if genes is not None:
 		    add_genes_from_event(genes, adj)
