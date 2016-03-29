@@ -1325,14 +1325,26 @@ class EventFinder:
 	    adj.copy_num_change = copy_num_change
 
 	def construct_seq(chrom, span, break_start, break_end=None, repeat_size=3, add=False, minus=False, repeat_seq=None, flank=50):
-	    """start = begining coord of repeat, end = end coord"""
+	    """start = begining coord of repeat, end = end coord
+
+	    In some cases an event may come from a genomic contig and lie close to an exon boundary,
+	    this may cause the conversion from transcript to genome coordinate to not make sense
+	    and the sequence asked to be constructed impossible to do - in that case, None will be reported
+
+	    """
 	    if add and repeat_seq is not None:
-		return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start).lower() +\
-		       repeat_seq.upper() +\
-		       self.genome_fasta.fetch(chrom, break_start, span[1] + flank).lower()
+		try:
+		    return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start).lower() +\
+		           repeat_seq.upper() +\
+		           self.genome_fasta.fetch(chrom, break_start, span[1] + flank).lower()
+		except:
+		    return None
 	    elif minus and break_end is not None:
-		return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start - 1).upper() +\
-		       self.genome_fasta.fetch(chrom, break_end, span[1] + flank).lower()
+		try:
+		    return self.genome_fasta.fetch(chrom, span[0] - flank - 1, break_start - 1).upper() +\
+		           self.genome_fasta.fetch(chrom, break_end, span[1] + flank).lower()
+		except:
+		    return None
 
 	def identify_aa_repeat():
 	    def search_for_repeat(aa, pos):
@@ -1419,7 +1431,7 @@ class EventFinder:
 		                        break_start = break_start,
 		                        repeat_seq = repeat_seq * copy_num_change,
 		                        add = True)
-		if old_seq.lower() == new_seq.lower():
+		if old_seq is not None and new_seq is not None and old_seq.lower() == new_seq.lower():
 		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_start + 1), (copy_num_ref, copy_num_ref + copy_num_change))
 
 	    elif adj.event == 'repeat_reduction':
@@ -1439,7 +1451,7 @@ class EventFinder:
 		                        break_start = break_start,
 		                        break_end = break_end,
 	                                minus = True)
-		if old_seq.lower() == new_seq.lower():
+		if old_seq is not None and new_seq is not None and old_seq.lower() == new_seq.lower():
 		    return (repeat_start, repeat_end, repeat_seq, (break_start, break_end), (copy_num_ref, copy_num_ref - copy_num_change))
 	    return None
 
