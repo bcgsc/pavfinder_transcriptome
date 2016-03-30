@@ -727,6 +727,10 @@ class EventFinder:
 			    
 	if (adj.event == 'None' or adj.event is None) and adj.rearrangement is not None:
 	    adj.event = adj.rearrangement
+
+	# update support span
+	if adj.event == 'ins' and adj.size > 20:
+	    adj.support_span = (adj.seq_breaks[0], adj.seq_breaks[0] + 1)
 	
 	return genes
     
