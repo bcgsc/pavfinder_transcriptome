@@ -963,11 +963,6 @@ class EventFinder:
 		target_span = sorted([transcript.txt_coord_to_genome_coord(match[0]),
 	                              transcript.txt_coord_to_genome_coord(match[1])])
 		target = transcript.chrom
-		if transcript.strand == '-':
-		    if match_strand == '-':
-			strand = '+'
-		    else:
-			strand = '-'
 	    return create_alignment(query, query_span, target, target_span, strand)
 	
 	def get_transcript(block_matches):
@@ -995,10 +990,11 @@ class EventFinder:
 		    align = Alignment.from_alignedRead(aln, bam)
 		    query_len = align.query_len
 		    if align.is_valid and align.target == query_target[query]:
+			tcoords_sorted = sorted([align.tstart, align.tend])
 			if align.strand == '+':
-			    matches.append([align.tstart, align.tend])
+			    matches.append(tcoords_sorted)
 			else:
-			    matches.append([align.tend, align.tstart])
+			    matches.append(tcoords_sorted[::-1])
 		
 		if matches and len(matches) == 1:
 		    transcript = self.transcripts_dict[align.target]
@@ -1702,7 +1698,6 @@ class EventFinder:
 	    elif after:
 		unmatched = True
 		for i in range(index + 1, len(matches)):
-		    #print 'after', i, matches[i], index + 1, len(matches), unmatched
 		    if matches[i] is not None:
 			unmatched = False
 			break
