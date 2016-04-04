@@ -1637,6 +1637,11 @@ class EventFinder:
 	if adj.chroms[0] != adj.chroms[1] or adj.transcripts[0].strand != adj.transcripts[1].strand:
 	    return
 
+	# make sure upstream and downstream gene make sense
+	if (adj.upstream_transcript.strand == '+' and adj.upstream_transcript.exons[0][0] > adj.downstream_transcript.exons[0][0]) or\
+	   (adj.upstream_transcript.strand == '-' and adj.downstream_transcript.exons[-1][1] > adj.upstream_transcript.exons[-1][1]):
+	    return
+
 	# find interval between genes
 	interval = adj.transcripts[0].exons[-1][1] + 1, adj.transcripts[1].exons[0][0] - 1
 	if adj.transcripts[0].strand == '+':
