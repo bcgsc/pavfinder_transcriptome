@@ -442,12 +442,12 @@ class EventFinder:
 			bad = True
 
 		    elif event_type == 'fusion':
-			chroms = itemgetter(1,4)(key.split('-'))
-			for target in [bam.getrname(aln.tid) for aln in alns]:
-			    if target not in chroms:
-				failed_reason = 'chimera probe aligned to unknown chr:%s %s' % (target, chroms)
-				bad = True
-				break
+			#chroms = itemgetter(1,4)(key.split('-'))
+			#for target in [bam.getrname(aln.tid) for aln in alns]:
+			    #if target not in chroms:
+				#failed_reason = 'chimera probe aligned to unknown chr:%s %s' % (target, chroms)
+				#bad = True
+				#break
 			    
 			if not bad:
 			    window = 20
@@ -572,15 +572,15 @@ class EventFinder:
 		alns = list(group)
 
 		# subseq multi-maps -> remove
-		full_mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
-		if len(full_mapped_alns) > 1:
-		    removed = True
-		    print '%s - subseq multi-map' % query
-		    for i in events_by_query[seq_id]:
-			if events[i].key() == key:
-			    remove.add(i)
-			    break
-		    continue
+		#full_mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
+		#if len(full_mapped_alns) > 1:
+		    #removed = True
+		    #print '%s - subseq multi-map' % query
+		    #for i in events_by_query[seq_id]:
+			#if events[i].key() == key:
+			    #remove.add(i)
+			    #break
+		    #continue
 		
 		mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
 		if mapped_alns:
