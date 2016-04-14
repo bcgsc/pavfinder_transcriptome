@@ -131,6 +131,7 @@ def parse_args():
     filtering.add_argument("--no_utr", action="store_true", help="don't report events in UTR")
     filtering.add_argument("--include_nonsense_fusion", action="store_true", help="include non-sense fusions")
     filtering.add_argument("--include_non_exon_bound_fusion", action="store_true", help="include non-exon-bound fusions")
+    filtering.add_argument("--include_noncoding_fusion", action="store_true", help="include noncoding fusions")
     filtering.add_argument("--max_homol_len", type=int, help="maximum homology sequence length. Default:5", default=5)
     filtering.add_argument("--max_novel_len", type=int, help="maximum novel sequence length. Default:5", default=5)
     filtering.add_argument("--subseq_len", type=int, help="subsequence length for filtering. Default:50", default=50)
@@ -179,7 +180,8 @@ def main():
                                                                       max_homol_len=args.max_novel_len,
                                                                       max_novel_len=args.max_homol_len,
                                                                       only_sense_fusion=not args.include_nonsense_fusion,
-                                                                      only_exon_bound_fusion=not args.include_non_exon_bound_fusion
+                                                                      only_exon_bound_fusion=not args.include_non_exon_bound_fusion,
+                                                                      only_coding_fusion=not args.include_noncoding_fusion
                                                                       )
         
     if tbam:
@@ -194,7 +196,8 @@ def main():
                                                                                 max_homol_len=args.max_novel_len,
                                                                                 max_novel_len=args.max_homol_len,
                                                                                 only_sense_fusion=not args.include_nonsense_fusion,
-                                                                                only_exon_bound_fusion=not args.include_non_exon_bound_fusion
+                                                                                only_exon_bound_fusion=not args.include_non_exon_bound_fusion,
+                                                                                only_coding_fusion=not args.include_noncoding_fusion
                                                                                 )        
 
     # combine events from genome and transcriptome alignments

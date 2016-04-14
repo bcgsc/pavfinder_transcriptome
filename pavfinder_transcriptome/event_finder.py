@@ -31,6 +31,7 @@ class EventFinder:
                     min_indel_size=0, no_utr=False, no_indels=False, no_inv=True,
                     max_homol_len=5, max_novel_len=5,
                     only_sense_fusion=True, only_exon_bound_fusion=True,
+                    only_coding_fusion=True,
                     ):
 	def filter_adj(adj):
 	    def check_junc_seq(homol=False, novel=False):
@@ -115,7 +116,7 @@ class EventFinder:
 		   adj.genome_breaks[1] >= adj.transcripts[1].txStart() and adj.genome_breaks[1] <= adj.transcripts[1].txEnd():
 		    return False
 		
-		if not adj.transcripts[0].is_coding() or not adj.transcripts[1].is_coding():
+		if only_coding_fusion and (not adj.transcripts[0].is_coding() or not adj.transcripts[1].is_coding()):
 		    return False
 		
 		if (only_exon_bound_fusion or only_sense_fusion) and\
