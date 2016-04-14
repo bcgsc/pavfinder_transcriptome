@@ -358,6 +358,14 @@ def parse_blast(output, query_len):
 	    matches.append([tstart, tend])
     return matches
 
+def has_canonical_target(target):
+    """Check if target is not from 1-22,X,Y"""
+    target_name = target.lstrip('chromCHROM')
+    if target_name.isdigit() or target_name.upper() in ('X', 'Y'):
+	return True
+    else:
+	return False
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Module dealing with alignments")
