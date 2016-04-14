@@ -5,7 +5,7 @@ import glob
 from sets import Set
 from operator import itemgetter
 import collections
-from alignment import Alignment, reverse_complement, search_by_regex, search_by_align
+from alignment import Alignment, reverse_complement, search_by_regex, search_by_align, has_canonical_target
 from chimera import find_chimera
 from adjacency import Adjacency
 from translate import check_frame, nuc_to_aa
@@ -17,13 +17,14 @@ from intspan import intspan
 
 class EventFinder:
     
-    def __init__(self, genome_fasta, annot, transcripts_dict, working_dir, debug = False):
+    def __init__(self, genome_fasta, annot, transcripts_dict, working_dir, probe_len=100, debug=False):
 	self.genome_fasta = genome_fasta
 	self.transcripts_dict = transcripts_dict
 	self.annot = annot
 	self.debug = debug
 	self.exon_mapper = ExonMapper(annot, transcripts_dict, genome_fasta)
 	self.working_dir = working_dir
+	self.probe_len = probe_len
         
     def find_events(self, bam, query_fasta, target_fasta, target_type, 
                     gene_mappings=None, external_mappings=None,
@@ -347,11 +348,16 @@ class EventFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/probes.bam' % working_dir
 	    
-	    cmd = 'bwa mem %s/%s %s -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                   genome_index,
-	                                                                   probes_fa,
-	                                                                   nthreads,
-	                                                                   aln_bam_file)
+	    #cmd = 'bwa mem %s/%s %s -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                   #genome_index,
+	                                                                   #probes_fa,
+	                                                                   #nthreads,
+	                                                                   #aln_bam_file)
+	    cmd = 'gmap -D %s -d %s %s -n0 -f samse -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                                   genome_index,
+	                                                                                   probes_fa,
+	                                                                                   nthreads,
+	                                                                                   aln_bam_file)
 	    failed = False
 	    try:
 		if debug:
@@ -442,13 +448,6 @@ class EventFinder:
 			bad = True
 
 		    elif event_type == 'fusion':
-			#chroms = itemgetter(1,4)(key.split('-'))
-			#for target in [bam.getrname(aln.tid) for aln in alns]:
-			    #if target not in chroms:
-				#failed_reason = 'chimera probe aligned to unknown chr:%s %s' % (target, chroms)
-				#bad = True
-				#break
-			    
 			if not bad:
 			    window = 20
 			    chroms = list(itemgetter(1,4)(key.split('-')))
@@ -526,11 +525,16 @@ class EventFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/subseqs.bam' % working_dir
 	    
-	    cmd = 'bwa mem %s/%s %s -a -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                      genome_index,
-	                                                                      probes_fa,
-	                                                                      nthreads,
-	                                                                      aln_bam_file)
+	    #cmd = 'bwa mem %s/%s %s -a -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                      #genome_index,
+	                                                                      #probes_fa,
+	                                                                      #nthreads,
+	                                                                      #aln_bam_file)
+	    cmd = 'gmap -D %s -d %s %s -f samse -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                               genome_index,
+	                                                                               probes_fa,
+	                                                                               nthreads,
+	                                                                               aln_bam_file)
 	    failed = False
 	    try:
 		if debug:
@@ -553,6 +557,14 @@ class EventFinder:
 		    return True
 		else:
 		    return False
+
+	def overlap(chrom1, pos1, chrom2, pos2, window):
+	    """ check 2 genomic positions overlap with a window """
+	    if chrom1 == chrom2 and\
+	       pos1 >= pos2 - window and\
+	       pos1 <= pos2 + window:
+		return True
+	    return False
 	
 	def parse_and_filter(bam, window=100):
 	    events_by_query = collections.defaultdict(list)
@@ -562,6 +574,7 @@ class EventFinder:
     
 	    remove = Set()
 	    subseq_mappings = {}
+	    subseq_align_tallies = {}
 	    for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
 		seq_id, key, part = query.split(':')
 		event_type, chrom1, pos1, orient1, chrom2, pos2, orient2 = key.split('-')
@@ -570,20 +583,10 @@ class EventFinder:
 		    continue
 
 		alns = list(group)
-
-		# subseq multi-maps -> remove
-		#full_mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
-		#if len(full_mapped_alns) > 1:
-		    #removed = True
-		    #print '%s - subseq multi-map' % query
-		    #for i in events_by_query[seq_id]:
-			#if events[i].key() == key:
-			    #remove.add(i)
-			    #break
-		    #continue
 		
 		mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
 		if mapped_alns:
+		    subseq_align_tallies[query] = 0
 		    matched = []
 		    if not subseq_mappings.has_key(seq_id):
 			subseq_mappings[seq_id] = {}
@@ -591,17 +594,27 @@ class EventFinder:
 			subseq_mappings[seq_id][key] = {}
 		    for aln in mapped_alns:
 			target = bam.getrname(aln.tid)
-			if target == chrom1 and\
-			   aln.reference_start >= int(pos1) - window and\
-			   aln.reference_start <= int(pos1) + window:
+
+			if has_canonical_target(target):
+			    subseq_align_tallies[query] += 1
+
+			if overlap(target,
+			           aln.reference_start,
+			           chrom1,
+			           int(pos1),
+			           window):
 			    matched.append(1)
 
-			if target == chrom2 and\
-			   aln.reference_start >= int(pos2) - window and\
-			   aln.reference_start <= int(pos2) + window:
+			if overlap(target,
+			           aln.reference_start,
+			           chrom2,
+			           int(pos2),
+			           window):
 			    matched.append(2)
 
 		    subseq_mappings[seq_id][key][part] = matched
+
+	    multimapped = [query for query in subseq_align_tallies if subseq_align_tallies[query] > 1]
 			    
 	    for seq_id in events_by_query.keys():
 		if subseq_mappings.has_key(seq_id):
@@ -610,6 +623,15 @@ class EventFinder:
 			event_type = events[i].key().split('-')[0]
 			if event_type in ('dup', 'ITD', 'PTD'):
 			    continue
+
+			# check for multimapping of both subseqs
+			if '%s:%s:0' % (seq_id, events[i].key()) in multimapped and\
+			   '%s:%s:1' % (seq_id, events[i].key()) in multimapped:
+			    remove.add(i)
+			    print '%s: remove %s - both subseqs multimap' % (seq_id,
+			                                                     events[i].key())
+			    break
+
 			if subseq_mappings[seq_id].has_key(events[i].key()):	    
 			    if subseq_mappings[seq_id][events[i].key()].has_key('0') and\
 			       subseq_mappings[seq_id][events[i].key()].has_key('1') and\
@@ -705,7 +727,7 @@ class EventFinder:
 	    fix_orients()
 	    sort_genome_breaks()
 	    
-	adj.set_probe(query_seq)
+	adj.set_probe(query_seq, len_on_each_side=self.probe_len/2)
 	adj.size = adj.get_size()
 	
 	# if event is already defined, don't need to modify
@@ -1595,22 +1617,22 @@ class EventFinder:
 	if (adj.event == 'fusion' or adj.event == 'read_through'):
 	    if target_type == 'genome':
 		sense = False
-		if adj.transcripts[0].strand == adj.transcripts[1].strand and\
-		   align_strands[0] == align_strands[1]:
+		if ((adj.transcripts[0].strand == '+' and adj.orients[0] == 'L') or\
+		    (adj.transcripts[0].strand == '-' and adj.orients[0] == 'R'))\
+		   and\
+		   ((adj.transcripts[1].strand == '+' and adj.orients[1] == 'R') or\
+		    (adj.transcripts[1].strand == '-' and adj.orients[1] == 'L')):
 		    sense = True
-		    if align_strands[0] == '+':
-			set_orients(reverse=False)
-		    else:
-			set_orients(reverse=True)
+		    set_orients(reverse=False)
 
-		elif adj.transcripts[0].strand != adj.transcripts[1].strand and\
-		     align_strands[0] != align_strands[1]:
+		elif ((adj.transcripts[1].strand == '+' and adj.orients[1] == 'L') or\
+		      (adj.transcripts[1].strand == '-' and adj.orients[1] == 'R'))\
+		     and\
+		     ((adj.transcripts[0].strand == '+' and adj.orients[0] == 'R') or\
+		      (adj.transcripts[0].strand == '-' and adj.orients[0] == 'L')):
 		    sense = True
-		    if align_strands[0] == adj.transcripts[0].strand:
-			set_orients(reverse=False)
-		    else:
-			set_orients(reverse=True)
-			
+		    set_orients(reverse=True)
+
 	    elif target_type == 'transcripts':
 		sense = False
 		if align_strands[0] == align_strands[1]:
