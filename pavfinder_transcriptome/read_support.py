@@ -8,6 +8,8 @@ import multiprocessing as mp
 from intspan import intspan
 from collections import defaultdict
 
+events_flanking = ('fusion', 'read_through')
+
 def find_support(events, bam_file, query_fasta_file,
                  min_overlap=4, multi_mapped=False, perfect=True, get_seq=False, 
                  num_procs=1, debug=False):
@@ -34,15 +36,22 @@ def find_support(events, bam_file, query_fasta_file,
     
     def assign(event_to_coords, support):
 	for event in event_to_coords:
-	    total = 0
+	    total_spanning = 0
+	    if event.event in events_flanking:
+		total_flanking = 0
+	    else:
+		total_flanking = None
 	    if event_to_coords.has_key(event):
 		for seq_id, span in event_to_coords[event]:
 		    if not support.has_key(seq_id):
 			if debug:
 			    print '%s no support' % seq_id
 			continue
-		    total += support[seq_id][span]
-	    event.support = total
+		    total_spanning += support[seq_id][span][0]
+		    if total_flanking is not None and support[seq_id][span][1] is not None:
+			total_flanking += support[seq_id][span][1]
+	    event.spanning = total_spanning
+	    event.flanking = total_flanking
 
     coords = defaultdict(list)
     event_to_coords = defaultdict(list)
@@ -51,7 +60,7 @@ def find_support(events, bam_file, query_fasta_file,
 	seq_ids, support_spans = extract_support_spans(event)
 	for seq_id, support_span in zip(seq_ids, support_spans):
 	    span = support_span[0] - min_overlap, support_span[1] + min_overlap
-	    coords[seq_id].append(span)
+	    coords[seq_id].append((event.event, span))
 	    event_to_coords[event].append((seq_id, '-'.join(map(str, [span[0], span[1]]))))
 	    
     if len(coords) < 100 or num_procs == 1:
@@ -72,16 +81,14 @@ def find_support(events, bam_file, query_fasta_file,
 	                   get_seq=get_seq, 
 	                   debug=debug)
 	
-    #print 'coord', coords
-    #print 'sup', support
     assign(event_to_coords, support)
-
 
 def find_flanking(reads, breaks, contig_len, overlap_buffer=1, debug=False):
     tlens = []
     proper_pairs = Set()
     for read in reads:
-	if read.is_proper_pair and is_fully_mapped(read, contig_len):
+	if abs(read.tlen) > 0 and is_fully_mapped(read, contig_len):
+	#if read.is_proper_pair and is_fully_mapped(read, contig_len):
 	    proper_pairs.add(read.qname + str(read.pos))
 	    if read.tlen > 0:
 		tlens.append(read.tlen)
@@ -272,9 +279,9 @@ def extract_reads(bam, contigs, coords, tids, overlap_buffer, contig_fasta, perf
         results = {}
         reads = list(group)
 	support_reads = []
-        for breaks in coords[contig]:
+        for event, breaks in coords[contig]:
             # initialization
-            results[breaks] = {'spanning':0, 'flanking':0, 'depth':0, 'tiling':False}
+            results[breaks] = {'spanning':0, 'flanking':None, 'depth':0, 'tiling':False}
             
             breaks_sorted = sorted(breaks)
 	    results[breaks]['spanning'], support_reads = find_spanning(reads, breaks_sorted, contig_seq, 
@@ -282,13 +289,14 @@ def extract_reads(bam, contigs, coords, tids, overlap_buffer, contig_fasta, perf
 	                                                               perfect=perfect, 
 	                                                               get_seq=get_seq, 
 	                                                               debug=debug)
-	    #results[breaks]['tiling'] = check_tiling(reads, breaks_sorted, contig_len, debug=debug)	    
-	    #results[breaks]['flanking'], tlens = find_flanking(reads, breaks_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
+	    #results[breaks]['tiling'] = check_tiling(reads, breaks_sorted, contig_len, debug=debug)
+	    if event in events_flanking:
+		results[breaks]['flanking'], tlens = find_flanking(reads, breaks_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
 	    #tlens_all.extend(tlens)
                                                                                 
         for breaks in results.keys():
             #support.append((contig, breaks[0], breaks[1], results[breaks]['spanning'], results[breaks]['flanking'], results[breaks]['tiling'], support_reads))
-	    support.append((contig, breaks[0], breaks[1], results[breaks]['spanning']))
+	    support.append((contig, breaks[0], breaks[1], results[breaks]['spanning'], results[breaks]['flanking']))
 
         count += 1        
         if count > len(contigs):
@@ -366,11 +374,11 @@ def scan_all(coords, bam_file, contig_fasta_file, num_procs, overlap_buffer, per
 		continue
 	    
             #contig, start, stop, spanning, flanking, tiling, support_reads = support
-	    contig, start, stop, spanning = support
+	    contig, start, stop, spanning, flanking = support
 	    if not results.has_key(contig):
 		results[contig] = {}
             coords = '%s-%s' % (start, stop)
-	    results[contig][coords] = spanning
+	    results[contig][coords] = spanning, flanking
             #try:
                 ##results[contig][coords] = (spanning, flanking, tiling, support_reads)
 		#results[contig][coords] = spanning
@@ -403,11 +411,11 @@ def fetch_support(coords, bam_file, contig_fasta_file, overlap_buffer=0, perfect
     contig_fasta = pysam.FastaFile(contig_fasta_file)
     results = {}
     tlens_all = []
-    for contig, spans in coords.iteritems():
+    for contig, event_spans in coords.iteritems():
         results[contig] = {}
 	contig_seq = contig_fasta.fetch(contig)
 	contig_len = len(contig_seq)
-        for span in spans:
+        for event, span in event_spans:
             # initialize results
             coords = '-'.join(map(str, span))
             results[contig][coords] = [0, 0]
@@ -426,11 +434,13 @@ def fetch_support(coords, bam_file, contig_fasta_file, overlap_buffer=0, perfect
 	                                            perfect=perfect, 
 	                                            get_seq=get_seq)
 	    #tiling = check_tiling(reads, span_sorted, contig_len, debug=debug)
-	    #flanking, tlens = find_flanking(reads, span_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
+	    flanking, tlens = None, None
+	    if event in events_flanking:
+		flanking, tlens = find_flanking(reads, span_sorted, contig_len, overlap_buffer=overlap_buffer, debug=debug)
 	    #results[contig][coords] = (spanning, flanking, tiling, support_reads)
 	    #tlens_all.extend(tlens)
 	    
-	    results[contig][coords] = spanning
+	    results[contig][coords] = spanning, flanking
                                            
     return results
 
