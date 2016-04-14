@@ -44,7 +44,8 @@ class Adjacency:
          ('in_frame', 'in_frame'),
          ('probe', 'probe'),
          ('support_span', 'support_span'),
-         ('support_reads', 'support'),
+         ('spanning_reads', 'spanning'),
+         ('flanking_pairs', 'flanking'),
          ]
     )
     
@@ -90,7 +91,8 @@ class Adjacency:
          ('in_frame', 'in_frame'),
          ('probe', 'probe'),
          ('support_span', 'support_span'),
-         ('support_reads', 'support'),
+         ('spanning_reads', 'spanning'),
+         ('flanking_pairs', 'flanking'),
          ]
     )
 
@@ -108,7 +110,7 @@ class Adjacency:
                  upstream_transcript = None, downstream_transcript = None,
                  exons_oriented = None, exon_bounds_oriented = None,
                  feature = None, effect = None, in_frame = None, sense_fusion=None,
-                 support_span=None, support = None,
+                 support_span=None, spanning=None, flanking=None,
                  probe=None, size=None, link=None):
 	for attr, value in locals().iteritems():
 	    setattr(self, attr, value)
