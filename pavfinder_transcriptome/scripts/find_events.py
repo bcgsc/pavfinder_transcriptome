@@ -212,7 +212,7 @@ def main():
     # read support
     if args.r2c:
         find_support(events_merged, args.r2c, args.query_fasta, num_procs=args.nproc, debug=args.debug)
-        events_filtered = [event for event in events_merged if event.support >= args.min_support]
+        events_filtered = [event for event in events_merged if event.spanning >= args.min_support]
     else:
         events_filtered = events_merged
 
