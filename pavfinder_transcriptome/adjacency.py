@@ -669,23 +669,31 @@ class Adjacency:
     def update_transcript(self, transcript):
 	self.genome_breaks = [transcript.txt_coord_to_genome_coord(coord) for coord in self.breaks]
 	self.exons = [transcript.txt_coord_to_exon(coord) for coord in self.breaks]
-		        
-    @classmethod
-    def extract_probe(cls, contig_seq, contig_breaks, len_on_each_side=25):
-	start, end = contig_breaks
-	if contig_breaks[0] > contig_breaks[1]:
-	    start, end = contig_breaks[1], contig_breaks[0]
-		
-	upstream_coord = max(0, start - len_on_each_side)
-	downstream_coord = min(end - 1 + len_on_each_side, len(contig_seq))
-	    
-	return contig_seq[upstream_coord:downstream_coord], start - upstream_coord
     
-    def set_probe(self, query_seq, len_on_each_side=30):
+    def set_probe(self, query_seq, len_on_each_side=50):
+	"""Sets probe sequence of adjacency
+
+	Tries to put len_on_each_side bases on each side of breakpoint
+	And tries to put minimum of 2xlen_on_each_side
+	i.e. if one side is less than len_on_each_side, tries to compensate on the other side
+	"""
 	breaks = sorted(self.seq_breaks)
-	start = max(0, breaks[0] - len_on_each_side)
-	end = min(breaks[1] - 1 + len_on_each_side, len(query_seq))
-	self.probe = query_seq[start : end]
+
+	up_seq = query_seq[:breaks[0]]
+	down_seq = query_seq[breaks[1] - 1:]
+	up_short = down_short = 0
+	if len(up_seq) < len_on_each_side:
+	    up_short = len_on_each_side - len(up_seq)
+	if len(down_seq) < len_on_each_side:
+	    down_short = len_on_each_side - len(down_seq)
+	if up_short > 0 and down_short > 0:
+	    self.probe = query_seq
+	elif up_short > 0:
+	    self.probe = up_seq + down_seq[:min(len_on_each_side + up_short, len(down_seq))]
+	elif down_short > 0:
+	    self.probe = up_seq[-1 * min(len(up_seq), len_on_each_side + down_short)::] + down_seq
+	else:
+	    self.probe = up_seq[-1 * min(len(up_seq), len_on_each_side)::] + down_seq[:min(len_on_each_side, len(down_seq))]
 	
     def get_subseqs(self, query_seq, len_on_each_side=50, seq_breaks=None):
 	if not seq_breaks:
@@ -699,21 +707,6 @@ class Adjacency:
 	    subseqs.append(query_seq[breaks[1] - 1 : min(len(query_seq), breaks[1] + len_on_each_side - 1)])
 
 	return subseqs
-	
-    @classmethod
-    def extract_probe_new(cls, contig_seq, contig_breaks, len_on_each_side=50, kmer_size=None, min_buffer=1):
-	probe = 'NA'
-	contig_breaks_sorted = sorted(contig_breaks)
-	print contig_breaks_sorted, min_buffer, kmer_size	
-	start = contig_breaks_sorted[1] + min_buffer - kmer_size + 1
-	end = contig_breaks_sorted[0] - min_buffer + kmer_size - 1
-	
-	probe_size = 0
-	if start >= 1 and end <= len(contig_seq) and end - start + 1 >= kmer_size:
-	    probe = contig_seq[start - 1 : end]
-	    probe_size = len(probe)
-	    	
-	return probe
 	
     def extract_subseqs(self, contig_fasta):
 	subseqs = []

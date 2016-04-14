@@ -134,6 +134,8 @@ def parse_args():
     filtering.add_argument("--max_homol_len", type=int, help="maximum homology sequence length. Default:5", default=5)
     filtering.add_argument("--max_novel_len", type=int, help="maximum novel sequence length. Default:5", default=5)
     filtering.add_argument("--subseq_len", type=int, help="subsequence length for filtering. Default:50", default=50)
+    filtering.add_argument("--probe_len", type=int, help="probe sequence length for filtering. Default:100", default=100)
+
     args = parser.parse_args()
     return args
 
@@ -163,7 +165,7 @@ def main():
     transcripts_dict = Transcript.extract_transcripts(args.gtf)
     annot_tabix = create_pysam_tabix(args.gtf)
             
-    ef = EventFinder(genome_fasta, annot_tabix, transcripts_dict, args.outdir, debug=args.debug)
+    ef = EventFinder(genome_fasta, annot_tabix, transcripts_dict, args.outdir, probe_len=args.probe_len, debug=args.debug)
     events = {'via_genome': {}, 'via_transcripts': {}}
     mappings = {'via_genome': {}, 'via_transcripts': {}}
     gene_hits = None
