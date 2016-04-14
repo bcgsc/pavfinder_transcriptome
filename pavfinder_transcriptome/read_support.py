@@ -103,6 +103,8 @@ def find_flanking(reads, breaks, contig_len, overlap_buffer=1, debug=False):
 	 
 	if frag is not None and frag[0] <= breaks[0] - overlap_buffer and frag[1] >= breaks[1] + overlap_buffer:
 	    uniq_frags.add(frag)
+	    if debug:
+		sys.stdout.write("Accepted flanking pair: %s %s %s %s %s\n" % (breaks, frag, read.query_name, read.pos, read.pnext))
 		
     if debug:
 	for f in uniq_frags:
