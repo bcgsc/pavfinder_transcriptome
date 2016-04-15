@@ -282,7 +282,6 @@ class EventFinder:
 		    if self.transcripts_dict.has_key(align.target):
 			genes.add(self.transcripts_dict[align.target].gene)
 
-		print 'zz1', target_fasta
 		adjs = self.find_indels(align, query_fasta, target_fasta, target_type, 
 		                        min_size=min_indel_size, no_indels=no_indels)
 		for adj in adjs:
@@ -1216,7 +1215,6 @@ class EventFinder:
 		                            align.strand)
 
 	    if event_type == 'del':
-		print 'mmm', target_fasta
 		self.is_repeat_number_change(adj,
 	                                     query_fasta,
 	                                     target_fasta,
@@ -1540,7 +1538,6 @@ class EventFinder:
 	elif adj.rearrangement == 'del':
 	    target_breaks_sorted = sorted(adj.target_breaks)
 	    # don't need to reverse-complement because target sequence is used
-	    print 'zzz', target_fasta
 	    changed_seq = target_fasta.fetch(adj.targets[0], target_breaks_sorted[0], target_breaks_sorted[1] - 1)	    
 	
 	if len(changed_seq) <= max_size and (len(changed_seq) % 2 == 0 or len(changed_seq) % 3 == 0) and not self.is_homopolymer(changed_seq):
