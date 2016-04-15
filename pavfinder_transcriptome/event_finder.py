@@ -349,16 +349,11 @@ class EventFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/probes.bam' % working_dir
 	    
-	    #cmd = 'bwa mem %s/%s %s -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                   #genome_index,
-	                                                                   #probes_fa,
-	                                                                   #nthreads,
-	                                                                   #aln_bam_file)
-	    cmd = 'gmap -D %s -d %s %s -n0 -f samse -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                                   genome_index,
-	                                                                                   probes_fa,
-	                                                                                   nthreads,
-	                                                                                   aln_bam_file)
+	    cmd = 'bwa mem %s/%s %s -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                   genome_index,
+	                                                                   probes_fa,
+	                                                                   nthreads,
+	                                                                   aln_bam_file)
 	    failed = False
 	    try:
 		if debug:
@@ -526,16 +521,11 @@ class EventFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/subseqs.bam' % working_dir
 	    
-	    #cmd = 'bwa mem %s/%s %s -a -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                      #genome_index,
-	                                                                      #probes_fa,
-	                                                                      #nthreads,
-	                                                                      #aln_bam_file)
-	    cmd = 'gmap -D %s -d %s %s -f samse -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                               genome_index,
-	                                                                               probes_fa,
-	                                                                               nthreads,
-	                                                                               aln_bam_file)
+	    cmd = 'bwa mem %s/%s %s -a -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                      genome_index,
+	                                                                      probes_fa,
+	                                                                      nthreads,
+	                                                                      aln_bam_file)
 	    failed = False
 	    try:
 		if debug:
