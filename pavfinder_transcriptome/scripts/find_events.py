@@ -170,6 +170,7 @@ def main():
     events = {'via_genome': {}, 'via_transcripts': {}}
     mappings = {'via_genome': {}, 'via_transcripts': {}}
     gene_hits = None
+    print 'zzz', genome_fasta
     if gbam and annot_tabix:
         events['via_genome'], mappings['via_genome'] = ef.find_events(gbam,
                                                                       query_fasta,
