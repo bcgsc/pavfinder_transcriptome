@@ -349,11 +349,16 @@ class EventFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/probes.bam' % working_dir
 	    
-	    cmd = 'bwa mem %s/%s %s -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                   genome_index,
-	                                                                   probes_fa,
-	                                                                   nthreads,
-	                                                                   aln_bam_file)
+	    #cmd = 'bwa mem %s/%s %s -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                   #genome_index,
+	                                                                   #probes_fa,
+	                                                                   #nthreads,
+	                                                                   #aln_bam_file)
+	    cmd = 'gmap -D %s -d %s %s -n0 -f samse -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                                   genome_index,
+	                                                                                   probes_fa,
+	                                                                                   nthreads,
+	                                                                                   aln_bam_file)
 	    failed = False
 	    try:
 		if debug:
@@ -370,7 +375,7 @@ class EventFinder:
 		return None
 	    
 	def parse_and_filter(bam, fasta_file, qname_to_event, indel_size_check=20):
-	    def within_same_gene(alns, query_seq, event, min_mapped=0.9):
+	    def within_same_gene(alns, query_seq, event, min_mapped=0.9, window=50):
 		"""check if subseq of fusion lie in same gene or do not lie in one of the genes"""
 		query_spans = intspan()
 		aligns = []
@@ -385,14 +390,14 @@ class EventFinder:
 		    for i in range(len(aligns)):
 			for transcript in event.transcripts:
 			    if aligns[i].target == transcript.chrom and\
-			       aligns[i].tstart >= transcript.exons[0][0] and\
-			       aligns[i].tend <= transcript.exons[-1][1]:
+			       ((aligns[i].tstart >= transcript.exons[0][0] - window and aligns[i].tstart <= transcript.exons[-1][1] + window)\
+			        or\
+			        (aligns[i].tend >= transcript.exons[0][0] - window and aligns[i].tend <= transcript.exons[-1][1] + window)):
 				mappings[transcript.id].append(i)
 		    if not mappings:
 			return 'fusion subseq not mapped to either of the 2 genes'
-		    for transcript in event.transcripts:
-			if mappings.has_key(transcript.id) and len(mappings[transcript.id]) == len(alns):
-			    return 'fusion subseq mapped to only a single gene'
+		    if len(mappings.keys()) < len(event.transcripts):
+			return 'fusion subseq mapped to only a single gene'
 		return False
 
 	    fasta = pysam.FastaFile(fasta_file)
@@ -439,7 +444,7 @@ class EventFinder:
 			    bad = True
 
 		elif 'repeat' not in event_type:
-		    if event_type in ('fusion', 'read_through') and not aln.is_unmapped and aln.cigartuples[0][0] == 0 and aln.cigartuples[-1][0] == 0:
+		    if event_type == 'fusion' and not aln.is_unmapped and aln.cigartuples[0][0] == 0 and aln.cigartuples[-1][0] == 0:
 			failed_reason = 'probe align from end to end %s' % aln.cigarstring
 			bad = True
 
@@ -521,11 +526,16 @@ class EventFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/subseqs.bam' % working_dir
 	    
-	    cmd = 'bwa mem %s/%s %s -a -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                      genome_index,
-	                                                                      probes_fa,
-	                                                                      nthreads,
-	                                                                      aln_bam_file)
+	    #cmd = 'bwa mem %s/%s %s -a -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                      #genome_index,
+	                                                                      #probes_fa,
+	                                                                      #nthreads,
+	                                                                      #aln_bam_file)
+	    cmd = 'gmap -D %s -d %s %s -f samse -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
+	                                                                               genome_index,
+	                                                                               probes_fa,
+	                                                                               nthreads,
+	                                                                               aln_bam_file)
 	    failed = False
 	    try:
 		if debug:
