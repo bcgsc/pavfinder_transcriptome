@@ -330,16 +330,20 @@ class EventFinder:
 		   event.event in ('alt_donor', 'alt_acceptor', 'skipped_exon'):
 		    continue
 
-		seq_id = event.seq_id.split(',')[0]
-		probe = event.probe.split(',')[0]
+		seq_ids = event.seq_id.split(',')
+		probes = event.probe.split(',')
+		for i in range(len(seq_ids)):
+		    seq_id = seq_ids[i]
+		    probe = probes[i]
+
+		    if type(event.size) is str or event.size >= min_size:
+			if len(probe) > 0:
+			    qname = '%s:%s:%s' % (seq_id, event.key(), event.size)
+			    fa.write('>%s\n%s\n' % (qname, probe))
+			    qname_to_event[qname] = event
+			else:
+			    print 'probe empty', seq_id, event.keys(), probe
 		
-		if type(event.size) is str or event.size >= min_size: 
-		    if len(probe) > 0:
-			qname = '%s:%s:%s' % (seq_id, event.key(), event.size)
-			fa.write('>%s\n%s\n' % (qname, probe))
-			qname_to_event[qname] = event
-		    else:
-			print 'probe empty', seq_id, event.keys(), probe
 	    fa.close()
 	    fai = fa_file + '.fai'
 	    if os.path.exists(fai):
@@ -401,11 +405,7 @@ class EventFinder:
 		return False
 
 	    fasta = pysam.FastaFile(fasta_file)
-
-	    events_by_query = collections.defaultdict(list)
-	    for i in range(len(events)):
-		seq_id = events[i].seq_id.split(',')[0]
-		events_by_query[seq_id].append(i)
+	    events_by_key = dict((events[i].key(), i) for i in range(len(events)))
     
 	    remove = Set()
 	    for query, group in groupby(bam.fetch(until_eof=True), lambda aln: aln.query_name):
@@ -480,10 +480,7 @@ class EventFinder:
 		    
 		if bad:
 		    print '%s probe failed: %s' % (seq_id, failed_reason)
-		    for i in events_by_query[seq_id]:
-			if events[i].key() == key:
-			    remove.add(i)
-			    break
+		    remove.add(events_by_key[key])
 			
 	    for i in sorted(list(remove), reverse=True):
 		del events[i]
