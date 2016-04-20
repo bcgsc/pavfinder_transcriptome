@@ -17,11 +17,13 @@ def combine_events(events, mappings):
         if event_t.rearrangement == event_g.rearrangement or\
            event_t.event == event_g.event or\
            (event_t.event in ('fusion', 'read_through') and event_g.event in ('fusion', 'read_through')):
-            genome_breaks_t = sorted(event_t.genome_breaks)
-            genome_breaks_g = sorted(event_g.genome_breaks)
             seq_breaks_t = sorted(event_t.seq_breaks)
-            seq_breaks_g = sorted(event_g.seq_breaks)
-            
+            if type(event_g.seq_breaks) is tuple or type(event_g.seq_breaks) is list:
+                seq_breaks_g = sorted(event_g.seq_breaks)
+            # after merging, tuple become str
+            elif type(event_g.seq_breaks) is str:
+                seq_breaks_g = sorted(map(int, event_g.seq_breaks.split('-')))
+
             if abs(seq_breaks_t[0] - seq_breaks_g[0]) <= window and\
                abs(seq_breaks_t[1] - seq_breaks_g[1]) <= window:
                 if event_g.exon_bounds and\
