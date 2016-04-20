@@ -33,7 +33,7 @@ def combine_events(events, mappings):
                      event_t.exon_bounds[1]:
                     return event_t
                 else:
-                    if event_g.event in ('ITD'):
+                    if event_g.event in ('ITD') and not event_t.seq_id in contigs_same_genome_event:
                         return event_t
                     return event_g
         return False
@@ -64,7 +64,22 @@ def combine_events(events, mappings):
                 
         return passed
 
+    def extract_multiple_contig_events(events_by_contig):
+        """Finds multiple contigs that map to same event, for use in same_event()"""
+        events = []
+        for contig in events_by_contig.keys():
+            events.extend(events_by_contig[contig])
+        events_merged = Adjacency.merge(events)
+        contigs = Set()
+        for event in events_merged:
+            if ',' in event.seq_id:
+                for contig in event.seq_id.split(','):
+                    contigs.add(contig)
+        return contigs
+
     combined_events = []
+    contigs_same_genome_event = extract_multiple_contig_events(events['via_genome'])
+
     for query in Set(events['via_genome'].keys()) | Set(events['via_transcripts'].keys()):
         if events['via_genome'] and events['via_transcripts'] and not same_mapping(query):
             continue
@@ -94,8 +109,6 @@ def combine_events(events, mappings):
                     event = same_event(events_t[i], events_g[j])
                     if event:
                         combined_events.append(event)
-                    #if same_event(events_t[i], events_g[j]):
-                        #combined_events.append(events_t[i])
                         used_t.add(i)
                         used_g.add(j)
                         
