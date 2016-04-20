@@ -978,7 +978,13 @@ class EventFinder:
 		match_strand = '-'
 		    
 	    target_span = sorted([match[0], match[1]])
-	    strand = match_strand
+	    if transcript.strand == '+':
+		strand = match_strand
+	    else:
+		if match_strand == '+':
+		    strand = '-'
+		else:
+		    strand = '+'
 	    if target_type == 'genome':
 		target_span = sorted([transcript.txt_coord_to_genome_coord(match[0]),
 	                              transcript.txt_coord_to_genome_coord(match[1])])
