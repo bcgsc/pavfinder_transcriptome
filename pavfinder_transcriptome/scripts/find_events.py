@@ -143,6 +143,7 @@ def parse_args():
     filtering = parser.add_argument_group('filtering')
     filtering.add_argument("--min_support", type=int, help="minimum read support. Default:4", default=4)
     filtering.add_argument("--min_indel_size", type=int, help="minimum indel size. Default:3", default=3)
+    filtering.add_argument("--min_indel_flanking", type=int, help="minimum flanking contig lengths for indels. Default:10", default=10)
     filtering.add_argument("--no_utr", action="store_true", help="don't report events in UTR")
     filtering.add_argument("--include_nonsense_fusion", action="store_true", help="include non-sense fusions")
     filtering.add_argument("--include_non_exon_bound_fusion", action="store_true", help="include non-exon-bound fusions")
@@ -191,6 +192,7 @@ def main():
                                                                       genome_fasta,
                                                                       'genome',
                                                                       min_indel_size=args.min_indel_size,
+                                                                      min_indel_flanking=args.min_indel_flanking,
                                                                       no_utr=args.no_utr,
                                                                       max_homol_len=args.max_novel_len,
                                                                       max_novel_len=args.max_homol_len,
@@ -206,6 +208,7 @@ def main():
                                                                                 'transcripts',
                                                                                 external_mappings=mappings['via_genome'],
                                                                                 min_indel_size=args.min_indel_size,
+                                                                                min_indel_flanking=args.min_indel_flanking,
                                                                                 no_utr=args.no_utr,
                                                                                 no_indels=True,
                                                                                 max_homol_len=args.max_novel_len,

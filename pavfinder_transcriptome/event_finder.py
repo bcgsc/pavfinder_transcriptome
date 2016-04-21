@@ -28,7 +28,8 @@ class EventFinder:
         
     def find_events(self, bam, query_fasta, target_fasta, target_type, 
                     gene_mappings=None, external_mappings=None,
-                    min_indel_size=0, no_utr=False, no_indels=False, no_inv=True,
+                    min_indel_size=0, min_indel_flanking=0,
+                    no_utr=False, no_indels=False, no_inv=True,
                     max_homol_len=5, max_novel_len=5,
                     only_sense_fusion=True, only_exon_bound_fusion=True,
                     only_coding_fusion=True,
@@ -283,7 +284,7 @@ class EventFinder:
 			genes.add(self.transcripts_dict[align.target].gene)
 
 		adjs = self.find_indels(align, query_fasta, target_fasta, target_type, 
-		                        min_size=min_indel_size, no_indels=no_indels)
+		                        min_size=min_indel_size, min_flanking=min_indel_flanking, no_indels=no_indels)
 		for adj in adjs:
 		    self.update_adj(adj, (align, align), query_seq, target_type, block_matches=block_matches)
 		    if target_type == 'genome' and not genes:
@@ -1139,7 +1140,7 @@ class EventFinder:
 		
 	return new_multi_aligns
     
-    def find_indels(self, align, query_fasta, target_fasta, target_type, min_size=0, no_indels=False):
+    def find_indels(self, align, query_fasta, target_fasta, target_type, min_size=0, min_flanking=0, no_indels=False):
 	def extract_flanking_blocks():
 	    flanking_blocks = []
 	    block_idx = -1
@@ -1200,6 +1201,16 @@ class EventFinder:
 		    print '%s: filter out %s - size too small %d' % (align.query,
 		                                                     event_type,
 		                                                     max(target_gap, query_gap))
+		continue
+
+	    if event_type in ('ins', 'del') and\
+	       (query_breaks[0] < min_flanking or\
+	        align.query_len - query_breaks[1] + 1 < min_flanking):
+		if self.debug:
+		    print '%s: filter out %s - flanking too small %d, %d' % (align.query,
+		                                                             event_type,
+		                                                             query_breaks[0],
+		                                                             align.query_len - query_breaks[1] + 1)
 		continue
 
 	    adj = Adjacency(align.query,
