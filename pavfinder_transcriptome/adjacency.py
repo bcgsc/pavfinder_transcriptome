@@ -683,6 +683,7 @@ class Adjacency:
 
 	up_seq = query_seq[:breaks[0]]
 	down_seq = query_seq[breaks[1] - 1:]
+	mid_seq = query_seq[breaks[0]:breaks[1] - 1]
 	up_short = down_short = 0
 	if len(up_seq) < len_on_each_side:
 	    up_short = len_on_each_side - len(up_seq)
@@ -691,11 +692,11 @@ class Adjacency:
 	if up_short > 0 and down_short > 0:
 	    self.probe = query_seq
 	elif up_short > 0:
-	    self.probe = up_seq + down_seq[:min(len_on_each_side + up_short, len(down_seq))]
+	    self.probe = up_seq + mid_seq + down_seq[:min(len_on_each_side + up_short, len(down_seq))]
 	elif down_short > 0:
-	    self.probe = up_seq[-1 * min(len(up_seq), len_on_each_side + down_short)::] + down_seq
+	    self.probe = up_seq[-1 * min(len(up_seq), len_on_each_side + down_short)::] + mid_seq + down_seq
 	else:
-	    self.probe = up_seq[-1 * min(len(up_seq), len_on_each_side)::] + down_seq[:min(len_on_each_side, len(down_seq))]
+	    self.probe = up_seq[-1 * min(len(up_seq), len_on_each_side)::] + mid_seq + down_seq[:min(len_on_each_side, len(down_seq))]
 	
     def get_subseqs(self, query_seq, len_on_each_side=50, seq_breaks=None):
 	if not seq_breaks:
