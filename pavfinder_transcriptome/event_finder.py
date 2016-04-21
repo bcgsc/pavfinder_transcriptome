@@ -404,6 +404,18 @@ class EventFinder:
 			return 'fusion subseq mapped to only a single gene'
 		return False
 
+	    def has_same_indel(aln, event_type, size):
+		"""check if probe alignment contains same simple indel as expected"""
+		if len(aln.cigartuples) >= 3:
+		    for i in range(len(aln.cigartuples) - 2):
+			if aln.cigartuples[i][0] == 0 and\
+			   aln.cigartuples[i + 2][0] == 0 and\
+			   ((event_type == 'ins' and aln.cigartuples[i + 1][0] == 1) or\
+			    (event_type == 'del' and aln.cigartuples[i + 1][0] == 2)) and\
+			   aln.cigartuples[i + 1][1] == size:
+			    return True
+		return False
+
 	    fasta = pysam.FastaFile(fasta_file)
 	    events_by_key = dict((events[i].key(), i) for i in range(len(events)))
     
@@ -425,6 +437,7 @@ class EventFinder:
 		if aln.is_unmapped:
 		    failed_reason = 'cannot map probe'
 		    bad = True
+
 		elif event_type in ('ins', 'del'):
 		    if aln.is_unmapped:
 			failed_reason = 'indel probe not mapped'
@@ -434,12 +447,7 @@ class EventFinder:
 			if len(alns) > 1:
 			    failed_reason = 'chimeric probe aligns for simple indel'
 			    bad = True
-			elif len(aln.cigartuples) != 3 or\
-			     (aln.cigartuples[0][0] != 0 and\
-			      aln.cigartuples[2][0] != 0 and\
-			      aln.cigartuples[1][1] != int(size) and\
-			      ((event_type == 'del' and aln.cigartuples[1][0] != 2) or\
-			       (event_type == 'ins' and aln.cigartuples[1][0] != 1))):
+			elif not has_same_indel(aln, event_type, int(size)):
 			    failed_reason = '%s %s probe align indel not matched %s' % (event_type, size, aln.cigarstring)
 			    bad = True
 
