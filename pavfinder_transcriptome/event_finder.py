@@ -1039,8 +1039,6 @@ class EventFinder:
 		    match = matches[0]
 		    if target_type == 'genome':
 			target = transcript.chrom
-			if transcript.strand == '-':
-			    match = matches[0][::-1]
 		    else:
 			target = align.target
 		    align = find_new_align(query, query_span[query], target, match, transcript)
