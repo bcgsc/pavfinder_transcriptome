@@ -125,7 +125,7 @@ class Alignment:
 	if self.qstart != 1 or self.qend < self.query_len:
 	    clipped = extract_clipped_seq()
 	    if not clipped:
-		return True
+		return False
 	    else:
 		for pos in clipped.keys():
 		    if is_homopolymer_fragment(clipped[pos]):
