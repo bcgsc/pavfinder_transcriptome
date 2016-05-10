@@ -86,15 +86,15 @@ class EventFinder:
 		    if not screen_genes(adj):
 			print '%s: event not mapped to same external gene' % adj.seq_id
 			return False
-		    
-	    if adj.transcripts is None or adj.exons is None or adj.exons[0] is None or adj.exons[1] is None:
+
+	    if adj.transcripts is None or adj.transcripts[0] is None or adj.transcripts[1] is None:
 		print '%s: cannot map event' % adj.seq_id
 		return False
 	    
-	    if not adj.transcripts or not adj.exons or adj.transcripts[0] is None or adj.transcripts[1] is None:	    
-		print '%s: event does not have transcripts or exons' % adj.seq_id
-		return False
-	    	    
+	    if adj.exons is None or adj.exons[0] is None or adj.exons[1] is None:
+		if not adj.event in ('fusion', 'read_through') or only_exon_bound_fusion:
+		    print '%s: cannot map event to exon' % adj.seq_id
+
 	    if adj.homol_seq is not None and adj.homol_seq != 'na' and not check_junc_seq(homol=True):
 		return False
 	    
@@ -163,7 +163,7 @@ class EventFinder:
 		    if len(genes) > 1 and\
 		       external_mappings is not None and\
 		       external_mappings.has_key(adj.seq_id):
-			if len(external_mappings[adj.seq_id][0]) == 1:
+			if len(external_mappings[adj.seq_id][0]) == 1 and external_mappings[adj.seq_id][1] == 'full':
 			    print '%s chimera mapped to single gene mapped:%s external:%s' % (adj.seq_id,
 			                                                                      genes,
 			                                                                      external_mappings[adj.seq_id][0]
@@ -231,6 +231,7 @@ class EventFinder:
 		    # skip align if it's invalid (e.g. begin with softclip) or 
 		    # query sequence is potentially homopolymer
 		    if align.is_valid() and\
+		       align.aligned_seq(query_seq) and\
 		       not self.is_homopolymer_fragment(align.aligned_seq(query_seq)):
 			if target_type == 'genome':
 			    if align.has_canonical_target():
@@ -488,7 +489,7 @@ class EventFinder:
 				bad = True
 		    
 		if bad:
-		    print '%s probe failed: %s' % (seq_id, failed_reason)
+		    print '%s probe failed: %s' % (query, failed_reason)
 		    remove.add(events_by_key[key])
 			
 	    for i in sorted(list(remove), reverse=True):
@@ -565,11 +566,11 @@ class EventFinder:
 		else:
 		    return False
 
-	def overlap(chrom1, pos1, chrom2, pos2, window):
+	def overlap(chrom1, span1, chrom2, pos2, window):
 	    """ check 2 genomic positions overlap with a window """
 	    if chrom1 == chrom2 and\
-	       pos1 >= pos2 - window and\
-	       pos1 <= pos2 + window:
+	       pos2 >= span1[0] - window and\
+	       pos2 <= span1[1] + window:
 		return True
 	    return False
 	
@@ -606,14 +607,14 @@ class EventFinder:
 			    subseq_align_tallies[query] += 1
 
 			if overlap(target,
-			           aln.reference_start,
+			           (aln.reference_start, aln.reference_end),
 			           chrom1,
 			           int(pos1),
 			           window):
 			    matched.append(1)
 
 			if overlap(target,
-			           aln.reference_start,
+			           (aln.reference_start, aln.reference_end),
 			           chrom2,
 			           int(pos2),
 			           window):
