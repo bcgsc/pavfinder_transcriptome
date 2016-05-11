@@ -94,6 +94,7 @@ class EventFinder:
 	    if adj.exons is None or adj.exons[0] is None or adj.exons[1] is None:
 		if not adj.event in ('fusion', 'read_through') or only_exon_bound_fusion:
 		    print '%s: cannot map event to exon' % adj.seq_id
+		    return False
 
 	    if adj.homol_seq is not None and adj.homol_seq != 'na' and not check_junc_seq(homol=True):
 		return False
