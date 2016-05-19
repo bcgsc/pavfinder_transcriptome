@@ -1023,7 +1023,7 @@ class EventFinder:
 		alns = list(group)
 		matches = []
 		query_len = None
-		query, pos = query_pos.split('-')
+		query, pos = query_pos.rsplit('-', 1)
 		for aln in alns:
 		    if aln.is_unmapped or aln.cigartuples[0][0] != 0 or aln.cigartuples[-1][0] != 0:
 			continue
