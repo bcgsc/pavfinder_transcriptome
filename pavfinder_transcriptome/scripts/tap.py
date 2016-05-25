@@ -313,6 +313,8 @@ def r2c_cleanup():
     temp_files = ['%s/r2c_cat_header.sam' % assembly_outdir]
     for ff in glob.glob('%s/*/*-merged.fa.*' % assembly_outdir):
         temp_files.append(ff)
+    for ff in glob.glob('%s/*/r2c.bam' % assembly_outdir):
+        temp_files.append(ff)
 
     for temp_file in temp_files:
         if os.path.exists(temp_file):
