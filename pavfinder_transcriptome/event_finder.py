@@ -447,10 +447,10 @@ class EventFinder:
 			bad = True
 
 		    elif size.isdigit() and int(size) <= indel_size_check:
-			if len(alns) > 1:
-			    failed_reason = 'chimeric probe aligns for simple indel'
-			    bad = True
-			elif not has_same_indel(aln, event_type, int(size)):
+			#if len(alns) > 1:
+			    #failed_reason = 'chimeric probe aligns for simple indel'
+			    #bad = True
+			if not has_same_indel(aln, event_type, int(size)):
 			    failed_reason = '%s %s probe align indel not matched %s' % (event_type, size, aln.cigarstring)
 			    bad = True
 
