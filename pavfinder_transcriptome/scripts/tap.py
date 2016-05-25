@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 from ruffus import *
 import ruffus.cmdline as cmdline
 import subprocess
@@ -9,21 +8,21 @@ import os
 import sys
 import glob
 import re
+import uuid
 
-def run_cmd(cmd):
+def run_cmd(cmd, force=False):
     process = subprocess.Popen(cmd,
                                stdout = subprocess.PIPE,
                                stderr = subprocess.PIPE,
                                shell = True)
+
     stdout_str, stderr_str = process.communicate()
-    if process.returncode != 0:
-        if re.search('error: no contigs assembled', stderr_str):
-            return stderr_str
-        #elif re.search('exit', stderr_str):
-            #return stderr_str
-        else:
-            raise Exception("Failed to run '%s'\n%s%sNon-zero exit status %s" %
-                            (cmd, stdout_str, stderr_str, process.returncode))
+
+    if process.returncode != 0 and not force:
+        raise Exception("Failed to run '%s'\n%s%sNon-zero exit status %s" %
+                        (cmd, stdout_str, stderr_str, process.returncode))
+
+    return stdout_str, stderr_str
     
 def format_read_pairs(fqs=None, list_file=None):
     fastqs = []
@@ -60,9 +59,12 @@ parser.add_argument('--sort_mem', type=str, help='samtools sort memory. Default:
 parser.add_argument('--genome_fasta', type=str, help='genome fasta')
 
 args = parser.parse_args()
-logger, logger_mutex = cmdline.setup_logging (__name__,
-                                              args.log_file,
+
+log_file = '/tmp/tap.%s.log' % uuid.uuid4()
+logger, logging_mutex = cmdline.setup_logging (__name__,
+                                              log_file,
                                               args.verbose)
+print 'log_file:', log_file
 
 cmdline.run(args)
 
@@ -105,7 +107,6 @@ def classify(paired_fqs, bbt_output, prefix, bf, nthreads):
                                                                            input_fq1,
                                                                            input_fq2)
         
-    print cmd
     run_cmd('/bin/bash -c "%s"' % cmd)
     
 @split(classify,
@@ -186,8 +187,9 @@ def symlink_assembly_input(read_pairs, k_dirs, ks):
                 
 @transform(symlink_assembly_input,
            formatter(".+/(.+)/(k\d+)"),
-           assembly_outdir + "/{1[0]}/{2[0]}/{1[0]}-final.fa")
-def assemble_single_gene(k_dir, contigs_file):
+           assembly_outdir + "/{1[0]}/{2[0]}/{1[0]}-final.fa",
+           logger, logging_mutex)
+def assemble_single_gene(k_dir, contigs_file, logger, logging_mutex):
     gene, k = filter(None, k_dir.split(os.sep))[-2:]
     
     cmd = 'transabyss --kmer %s --pe %s %s --outdir %s --name %s --cleanup 3' % (k.lstrip('k'),
@@ -195,9 +197,13 @@ def assemble_single_gene(k_dir, contigs_file):
                                                                                  '%s/%s_2.fastq.gz' % (k_dir, gene),
                                                                                  k_dir,
                                                                                  gene)
-    error = run_cmd(cmd)
-    if error and os.path.exists('%s/coverage.hist' % k_dir):
+    stdout_str, stderr_str = run_cmd(cmd, force=True)
+    if stderr_str and\
+       re.search('error: no contigs assembled', stderr_str) and\
+       os.path.exists('%s/coverage.hist' % k_dir):
         run_cmd('touch %s/%s-final.fa %s/%s-FINAL.COMPLETE' % (k_dir, gene, k_dir, gene))
+        with logging_mutex:
+            logger.info(stderr_str)
     
 @collate(assemble_single_gene,
          formatter(".+/k\d+/(.+)-final.fa$"),
@@ -260,8 +266,8 @@ def r2c(index, r2c_bam, nthreads, sort_mem):
                                                                                             reads2,
                                                                                             sort_mem,
                                                                                             os.path.splitext(r2c_bam)[0])
-        print 'ooo', cmd
-        #run_cmd('/bin/bash -c "%s"' % cmd)
+        #print 'ooo', cmd
+        run_cmd('/bin/bash -c "%s"' % cmd)
         
     else:
         cmd = 'touch %s' % r2c_bam
@@ -301,17 +307,25 @@ def r2c_concat(r2c_bams, r2c_cat_bam, sort_mem):
     cmd = '{ %s; } | samtools view -Su - | samtools sort -m %s - %s' % (bams_str,
                                                                        sort_mem,
                                                                        os.path.splitext(r2c_cat_bam)[0])
-    print cmd
     run_cmd('/bin/bash -c "%s"' % cmd)
 
+def r2c_cleanup():
+    temp_files = ['%s/r2c_cat_header.sam' % assembly_outdir]
+    for ff in glob.glob('%s/*/*-merged.fa.*' % assembly_outdir):
+        temp_files.append(ff)
+
+    for temp_file in temp_files:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+@posttask(r2c_cleanup)
 @transform(r2c_concat,
            suffix('.bam'),
            '.bam.bai')
 def r2c_index_concat(r2c_cat_sorted_bam, r2c_cat_sorted_bam_index):
     cmd = 'samtools index %s' % r2c_cat_sorted_bam
-    print cmd
     run_cmd(cmd)
-    
+           
 @transform(concat_fasta,
            formatter(".+.fa$"),
            "{path[0]}/c2g.bam",
@@ -356,8 +370,19 @@ def find_events(inputs, events_output, transcripts_index, gmap_index, gtf, genom
                                                                                                                 genome_fasta,
                                                                                                                 os.path.dirname(events_output)
                                                                                                                 )
-    print cmd
     run_cmd(cmd)
 
+def copy_log():
+    dest = '%s/log.txt' % args.outdir
+    if os.path.exists(dest):
+        cmd = 'cat %s >> %s' % (log_file, dest)
+    else:
+        cmd = 'cp -p %s %s' % (log_file, dest)
+
+    stdout_str, stderr_str = run_cmd(cmd, force=True)
+    if not stderr_str:
+        os.remove(log_file)
+
 pipeline_printout(sys.stdout, verbose=3)
-pipeline_run(verbose=3, multiprocess = args.nprocs)
+pipeline_run(verbose=3, multiprocess=args.nprocs, logger=logger)
+copy_log()
