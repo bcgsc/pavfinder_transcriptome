@@ -44,6 +44,19 @@ def format_read_pairs(fqs=None, list_file=None):
     
     return fastqs1, fastqs2
 
+def fill_annotation_args(args):
+    names = ('gmap_index', 'bwa_index', 'gtf', 'genome_fasta')
+    for name in names:
+        if getattr(args, name) is None and (os.environ.get(name) is not None or os.environ.get(name.upper()) is not None):
+            if os.environ.get(name):
+                value = os.environ.get(name)
+            else:
+                value = os.environ.get(name.upper())
+
+            if not ' ' in value:
+                setattr(args, name, value)
+            else:
+                setattr(args, name, value.split(' '))
 
 parser = cmdline.get_argparse(description='TAP pipeline')
 parser.add_argument('sample', type=str, help='sample name')
@@ -61,6 +74,7 @@ parser.add_argument('--sort_mem', type=str, help='samtools sort memory. Default:
 parser.add_argument('--genome_fasta', type=str, help='genome fasta')
 
 args = parser.parse_args()
+fill_annotation_args(args)
 
 logs_dir = args.outdir + '/logs'
 if not os.path.exists(logs_dir):
@@ -429,20 +443,22 @@ def c2t(contigs_fasta, c2t_bam, bwa_index, nthreads):
        args.bwa_index,
        args.gmap_index,
        args.gtf,
-       args.genome_fasta)
-def find_events(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fasta):
+       args.genome_fasta,
+       args.nprocs)
+def find_events(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fasta, nprocs):
     merged_fasta, c2g_bam, c2t_bam, r2c_index = inputs
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'find_events.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s %s %s %s %s' % (c2g_bam,
-                                                                                                                    c2t_bam,
-                                                                                                                    transcripts_index,
-                                                                                                                    ' '.join(gmap_index),
-                                                                                                                    os.path.splitext(r2c_index)[0],
-                                                                                                                    merged_fasta,
-                                                                                                                    gtf,
-                                                                                                                    genome_fasta,
-                                                                                                                    os.path.dirname(events_output)
-                                                                                                                    )
+        cmd = 'find_events.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s --nproc %d %s %s %s %s' % (c2g_bam,
+                                                                                                                               c2t_bam,
+                                                                                                                               transcripts_index,
+                                                                                                                               ' '.join(gmap_index),
+                                                                                                                               os.path.splitext(r2c_index)[0],
+                                                                                                                               nprocs,
+                                                                                                                               merged_fasta,
+                                                                                                                               gtf,
+                                                                                                                               genome_fasta,
+                                                                                                                               os.path.dirname(events_output)
+                                                                                                                               )
         run_cmd(cmd)
     else:
         run_cmd('touch %s' % events_output)
