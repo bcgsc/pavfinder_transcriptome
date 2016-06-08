@@ -118,8 +118,8 @@ class ExonMapper:
 	             'exon%d' % adj.exons[0],
 	             'exon%d' % adj.exons[1],
 	             ]
-	    if adj.support is not None:
-		label.append(adj.support)
+	    if adj.spanning is not None:
+		label.append(adj.spanning)
 	    cols.append('-'.join(map(str, label)))
 	    #cols.append('%s-%s-exon%d-exon%d' % (adj.transcripts[0].gene,
 	                                         #adj.transcripts[0].id,
@@ -127,8 +127,8 @@ class ExonMapper:
 	                                         #adj.exons[1]
 	                                         #)
 	                #)
-	    if adj.support is not None:
-		cols.append(adj.support)
+	    if adj.spanning is not None:
+		cols.append(adj.spanning)
 	    else:
 		cols.append('.')
 	    if adj.transcripts[0].strand == '+':

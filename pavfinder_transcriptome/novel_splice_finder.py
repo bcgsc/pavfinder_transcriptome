@@ -28,7 +28,7 @@ def filter_events(events, min_support):
     failed = Set()
     event_to_index = dict((events[i], i) for i in range(len(events)))
     for i in range(len(events)):
-	if events[i].support < min_support:
+	if events[i].spanning < min_support:
 	    failed.add(i)
 	    if events[i].link:
 		print 'failed link', events[i].seq_id, events[i].event
