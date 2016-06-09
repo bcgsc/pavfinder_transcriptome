@@ -217,7 +217,8 @@ def pair_reads(fastqs, input_file):
 
 @subdivide(pair_reads,
            formatter(),
-           "{path[0]}/k*",
+           #"{path[0]}/k*",
+           ["{path[0]}/k%d" % k for k in args.k],
            args.k)
 def symlink_assembly_input(assembly_input, k_dirs, ks):
     prefix = os.path.splitext(os.path.basename(assembly_input))[0]
@@ -225,8 +226,9 @@ def symlink_assembly_input(assembly_input, k_dirs, ks):
         k_dir = '%s/%s/k%d' % (assembly_outdir, prefix, k)
         if not os.path.exists(k_dir):
             os.makedirs(k_dir)
-
-        os.symlink(os.path.relpath(assembly_input, k_dir), '%s/%s' % (k_dir, os.path.basename(assembly_input)))
+        target = '%s/%s' % (k_dir, os.path.basename(assembly_input))
+        if not os.path.exists(target):
+            os.symlink(os.path.relpath(assembly_input, k_dir), target)
                 
 @transform(symlink_assembly_input,
            formatter(".+/(.+)/(k\d+)"),
