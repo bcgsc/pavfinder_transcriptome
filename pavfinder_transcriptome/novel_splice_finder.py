@@ -87,8 +87,17 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    adj.set_probe(query_seq)
 	else:
 	    adj.set_probe(query_seq)
+
+	set_frame(adj)
+
 	return adj
     
+    def set_frame(adj):
+	if adj.size % 3 == 0:
+	    adj.in_frame = True
+	else:
+	    adj.in_frame = False
+
     def split_event(event):
 	event1 = deepcopy(event)
 	event2 = deepcopy(event)
@@ -99,9 +108,9 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    event2['pos'] = (event['pos'][1] - 1, event['pos'][1])
 	    event2['seq_breaks'] = (event['seq_breaks'][1] - 1, event['seq_breaks'][1])
 	else:
-	    event1['pos'] = (event['pos'][0] - 1, event['pos'][0])
+	    event1['pos'] = (align.blocks[event['blocks'][0] - 1][1], event['pos'][0])
 	    event1['seq_breaks'] = (event['seq_breaks'][0] - 1, event['seq_breaks'][0])
-	    event2['pos'] = (event['pos'][1], event['pos'][1] + 1)
+	    event2['pos'] = (event['pos'][1], align.blocks[event['blocks'][-1] + 1][0])
 	    event2['seq_breaks'] = (event['seq_breaks'][1], event['seq_breaks'][1] + 1)
 
 	adj1 = event_to_adj(event1)
@@ -217,7 +226,6 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    adjs.extend(split_event(event))
 	else:
 	    adjs.append(event_to_adj(event))
-	
     return adjs
 	    	
 def report(event, event_id=None):
@@ -392,6 +400,7 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		else:
 		    donor_start = pos[0] - 2
 		    acceptor_start = pos[1] + 1
+
 		# check splice motif
 		if check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
 		    events.append({'event': 'novel_exon', 'exons': [], 'pos':pos, 'size':size})
