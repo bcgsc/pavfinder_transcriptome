@@ -41,24 +41,17 @@ class ExonMapper:
 	    for align in aligns:
 		if not align.has_canonical_target():
 		    continue
-		print align.query, align.target, align.qstart, align.qend, align.tstart, align.tend, align.blocks
 		block_matches = self.map_align(align)
 		if block_matches:
 		    tid = self.pick_best_mapping(block_matches, align)
 		    if tid is not None:
-			print block_matches
-			print 'best', tid, block_matches[tid]
 			transcript = self.transcripts_dict[tid]
 			olap = self.overlap(align, transcript)
-			print 'olap', olap
 			mappings[query].append((transcript.gene, transcript.id, olap))
 			
 			junc_adjs.extend(self.collect_junctions(align, transcript, block_matches[tid]))
 			
 			if find_events:
-			    #abc = find_novel_junctions(block_matches[tid], align, transcript, query_seq, self.genome_fasta)
-			    #for e in abc:
-				#print 'bbb', e.details()
 			    events.extend(find_novel_junctions(block_matches[tid],
 			                                       align,
 			                                       transcript,
@@ -67,16 +60,25 @@ class ExonMapper:
 			                                       accessory_known_features=accessory_known_features)
 			                  )
 	
-	print mappings
 	return mappings, junc_adjs, events
-    
+
+    @classmethod
+    def sort_adjs(cls, adjs):
+	dict_for_sorting = {}
+	for i in range(len(adjs)):
+	    key = adjs[i].chroms[0], adjs[i].genome_breaks[0], adjs[i].genome_breaks[1]
+	    dict_for_sorting[key] = i
+
+	adjs_sorted = []
+	for key in sorted(dict_for_sorting.keys(), Adjacency.cmp_genome_coords):
+	    adjs_sorted.append(adjs[dict_for_sorting[key]])
+
+	return adjs_sorted
+
     @classmethod
     def collect_junctions(cls, align, transcript, block_matches):
 	adjs = []
 	for i in range(len(align.blocks) - 1):
-	    print i, align.blocks[i], block_matches[i]
-	    print i+1, align.blocks[i+1], block_matches[i+1]
-	    
 	    if block_matches[i] is None or block_matches[i+1] is None:
 		continue
 	    
@@ -94,16 +96,24 @@ class ExonMapper:
 	    adj.exons = (transcript.exon_num(block_matches[i][-1][0]),
 	                 transcript.exon_num(block_matches[i + 1][0][0]))
 	    adjs.append(adj)
-	    print adj.details()
-	    print '---'
+
 	return adjs
     
     @classmethod
     def output_mappings(cls, mappings, out_file):
-	out = open(out_file, 'w')
+	# group by gene ...
+	groups_by_gene = defaultdict(list)
 	for query in sorted(mappings.keys()):
-	    for (gene, tid, olap) in mappings[query]:
-		out.write('%s\n' % '\t'.join((query, gene, tid, '%.2f' % olap)))
+	    for mapping in mappings[query]:
+		groups_by_gene[mapping[0]].append((query, mapping[0], mapping[1], mapping[2]))
+
+	# ... and sort by coverage
+	out = open(out_file, 'w')
+	out.write('%s\n' % '\t'.join(('contig', 'gene', 'transcript', 'coverage')))
+	for gene in sorted(groups_by_gene.keys()):
+	    for mapping in sorted(groups_by_gene[gene], key = lambda m: m[3], reverse=True):
+		query, gene, tid, olap = mapping
+		out.write('%s\n' % '\t'.join((query, gene, tid, '%.3f' % olap)))
 	out.close()
 	
     @classmethod
@@ -115,18 +125,13 @@ class ExonMapper:
 	    cols.append(adj.genome_breaks[1])
 	    label = [adj.transcripts[0].gene,
 	             adj.transcripts[0].id,
-	             'exon%d' % adj.exons[0],
-	             'exon%d' % adj.exons[1],
+	             'E%d' % adj.exons[0],
+	             'E%d' % adj.exons[1],
 	             ]
-	    if adj.spanning is not None:
-		label.append(adj.spanning)
-	    cols.append('-'.join(map(str, label)))
-	    #cols.append('%s-%s-exon%d-exon%d' % (adj.transcripts[0].gene,
-	                                         #adj.transcripts[0].id,
-	                                         #adj.exons[0],
-	                                         #adj.exons[1]
-	                                         #)
-	                #)
+	    #if adj.spanning is not None:
+		#label.append(adj.spanning)
+	    cols.append('.'.join(map(str, label)))
+
 	    if adj.spanning is not None:
 		cols.append(adj.spanning)
 	    else:
@@ -135,6 +140,7 @@ class ExonMapper:
 		cols.append('+')
 	    else:
 		cols.append('-')
+
 	    cols.append(adj.genome_breaks[0] - 1)
 	    cols.append(adj.genome_breaks[1])
 	    cols.append(0)
@@ -144,8 +150,7 @@ class ExonMapper:
 	    return '\t'.join(map(str, cols))
 	    
 	out = open(out_file, 'w')
-	for junc in juncs:
-	    print junc.details()
+	for junc in cls.sort_adjs(juncs):
 	    out.write('%s\n' % adj_to_bed(junc))
 	out.close()
 	
@@ -160,7 +165,6 @@ class ExonMapper:
 	    for event_type in event_types:
 		if event_type in ('retained_intron', 'novel_exon'):
 		    indices_ordered = []
-		    print 'mm', len(grouped_events[event_type])
 		    for i in range(len(grouped_events[event_type])):
 			if i in indices_ordered:
 			    continue
@@ -170,7 +174,6 @@ class ExonMapper:
 			    if j in indices_ordered:
 				continue
 			    if grouped_events[event_type][j].link == event:
-				print 'mmmm', i, j
 				indices_ordered.append(i)
 				indices_ordered.append(j)
 		    for i in indices_ordered:
@@ -191,7 +194,7 @@ class ExonMapper:
 	out = open(out_file, 'w')
 	out.write('%s\n' % '\t'.join(report_items))
 	events_ordered = group_events()
-	print 'gg', len(events), len(events_ordered)
+
 	counter = 1
 	for i in range(len(events_ordered)):
 	    if events_ordered[i].event in ('retained_intron', 'novel_exon'):
@@ -204,7 +207,7 @@ class ExonMapper:
 		    event_id = '%d.1' % counter
 	    else:
 		event_id = counter
-	    print 'gg', i, event_id
+
 	    out.write('%s\n' % report(events_ordered[i], event_id=event_id))
 	    
 	    if events_ordered[i].event not in ('retained_intron', 'novel_exon'):
