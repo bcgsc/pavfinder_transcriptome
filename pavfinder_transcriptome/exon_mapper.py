@@ -163,27 +163,28 @@ class ExonMapper:
 		
 	    events_ordered = []
 	    for event_type in event_types:
+		sorted_events = cls.sort_adjs(grouped_events[event_type])
 		if event_type in ('retained_intron', 'novel_exon'):
 		    indices_ordered = []
-		    for i in range(len(grouped_events[event_type])):
+		    for i in range(len(sorted_events)):
 			if i in indices_ordered:
 			    continue
-			event = grouped_events[event_type][i]
+			event = sorted_events[i]
 			
-			for j in range(i + 1, len(grouped_events[event_type])):
+			for j in range(i + 1, len(sorted_events)):
 			    if j in indices_ordered:
 				continue
-			    if grouped_events[event_type][j].link == event:
+			    if sorted_events[j].link == event:
 				indices_ordered.append(i)
 				indices_ordered.append(j)
 		    for i in indices_ordered:
-			events_ordered.append(grouped_events[event_type][i])
+			events_ordered.append(sorted_events[i])
 		else:
-		    for event in grouped_events[event_type]:
+		    for event in sorted_events:
 			events_ordered.append(event)
+
 	    return events_ordered
-	    
-	    
+ 
 	event_types = ['skipped_exon',
 	               'novel_exon',
 	               'novel_intron',
