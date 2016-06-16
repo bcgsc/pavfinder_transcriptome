@@ -15,7 +15,7 @@ import subprocess
 import pysam
 from intspan import intspan
 
-class EventFinder:
+class SVFinder:
     
     def __init__(self, genome_fasta, annot, transcripts_dict, working_dir, probe_len=100, debug=False):
 	self.genome_fasta = genome_fasta

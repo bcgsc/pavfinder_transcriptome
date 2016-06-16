@@ -7,7 +7,7 @@ import sys
 from sets import Set
 import pavfinder_transcriptome as pvt
 from pavfinder_transcriptome.transcript import Transcript
-from pavfinder_transcriptome.event_finder import EventFinder
+from pavfinder_transcriptome.sv_finder import SVFinder
 from pavfinder_transcriptome.adjacency import Adjacency
 from pavfinder_transcriptome.read_support import find_support
 
@@ -182,12 +182,12 @@ def main():
     transcripts_dict = Transcript.extract_transcripts(args.gtf)
     annot_tabix = create_pysam_tabix(args.gtf)
             
-    ef = EventFinder(genome_fasta, annot_tabix, transcripts_dict, args.outdir, probe_len=args.probe_len, debug=args.debug)
+    sf = SVFinder(genome_fasta, annot_tabix, transcripts_dict, args.outdir, probe_len=args.probe_len, debug=args.debug)
     events = {'via_genome': {}, 'via_transcripts': {}}
     mappings = {'via_genome': {}, 'via_transcripts': {}}
     gene_hits = None
     if gbam and annot_tabix:
-        events['via_genome'], mappings['via_genome'] = ef.find_events(gbam,
+        events['via_genome'], mappings['via_genome'] = sf.find_events(gbam,
                                                                       query_fasta,
                                                                       genome_fasta,
                                                                       'genome',
@@ -202,7 +202,7 @@ def main():
                                                                       )
         
     if tbam:
-        events['via_transcripts'], mappings['via_transcripts'] = ef.find_events(tbam,
+        events['via_transcripts'], mappings['via_transcripts'] = sf.find_events(tbam,
                                                                                 query_fasta,
                                                                                 transcripts_fasta,
                                                                                 'transcripts',
@@ -226,8 +226,8 @@ def main():
     
     # filter by checking probe and subseq alignments
     if events_merged and args.genome_index and len(args.genome_index) == 2:
-        ef.filter_probes(events_merged, args.genome_index[0], args.genome_index[1], args.outdir, debug=args.debug)
-        ef.filter_subseqs(events_merged, query_fasta, args.genome_index[0], args.genome_index[1], args.outdir,
+        sf.filter_probes(events_merged, args.genome_index[0], args.genome_index[1], args.outdir, debug=args.debug)
+        sf.filter_subseqs(events_merged, query_fasta, args.genome_index[0], args.genome_index[1], args.outdir,
                           subseq_len=args.subseq_len, debug=args.debug)
 
     # read support
@@ -238,13 +238,13 @@ def main():
         events_filtered = events_merged
 
     # determine if events are in- or out-of-frame
-    ef.set_frame(events_filtered, query_fasta, genome_fasta)
+    sf.set_frame(events_filtered, query_fasta, genome_fasta)
 
     # report (with meta data)
     cmd = ' '.join(sys.argv)
     time = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
     software = '%s %s' % (pvt.__name__, pvt.__version__)
-    Adjacency.report_events(events_filtered, '%s/events.bedpe' % args.outdir, sort_by_coord=args.sort_by_coord, header=(software, '%s %s' % (time, cmd)))
+    Adjacency.report_events(events_filtered, '%s/sv.bedpe' % args.outdir, sort_by_coord=args.sort_by_coord, header=(software, '%s %s' % (time, cmd)))
 
 main()
     
