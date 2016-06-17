@@ -1,6 +1,9 @@
 import argparse
 import os
+import sys
+import datetime
 import pysam
+import pavfinder_transcriptome as pvt
 from pavfinder_transcriptome.exon_mapper import ExonMapper
 from pavfinder_transcriptome.transcript import Transcript
 from pavfinder_transcriptome.novel_splice_finder import extract_features, filter_events
@@ -74,8 +77,11 @@ def main():
 	if events_merged:
 	    filter_events(events_merged, args.min_support)
     
+    cmd = ' '.join(sys.argv)
+    time = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+    software = '%s %s' % (pvt.__name__, pvt.__version__)
     em.output_mappings(mappings, '%s/mappings.tsv' % args.outdir)
     em.output_juncs(juncs_merged, '%s/junctions.bed' % args.outdir)    
-    em.output_events(events_merged, '%s/novel_splicing.tsv' % args.outdir)
+    em.output_events(events_merged, '%s/novel_splicing.bedpe' % args.outdir, header=(software, '%s %s' % (time, cmd)))
     
 main()
