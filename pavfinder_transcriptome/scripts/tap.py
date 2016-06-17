@@ -67,11 +67,15 @@ parser.add_argument('--fq_list', type=str, help='text file of input fastq paths'
 parser.add_argument('--nprocs', type=int, default=64, help='number of threads/processes')
 parser.add_argument('--k', type=int, nargs='+', help='k sizes for assembly')
 parser.add_argument('--readlen', type=int, help='read length')
+parser.add_argument('--only_assembly', action='store_true')
+parser.add_argument('--only_sv', action='store_true')
+parser.add_argument('--only_splicing', action='store_true')
 parser.add_argument('--gmap_index', type=str, nargs=2, help='gmap index')
 parser.add_argument('--bwa_index', type=str, help='bwa index of transcript sequences')
 parser.add_argument('--gtf', type=str, help='gtf')
 parser.add_argument('--sort_mem', type=str, help='samtools sort memory. Default:5G', default='5G')
 parser.add_argument('--genome_fasta', type=str, help='genome fasta')
+parser.add_argument("--suppl_annot", type=str, nargs="+", help="supplementary annotation file(s) for checking novel splice events")
 
 args = parser.parse_args()
 fill_annotation_args(args)
@@ -285,6 +289,7 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
 
     run_cmd(cmd)
     
+@active_if(not args.only_assembly)
 @transform(merge_assemblies,
            formatter(".+-merged.fa"),
            "{0[0]}.bwt")
@@ -297,6 +302,7 @@ def r2c_bwa_index(merged_fasta, index):
         
     run_cmd(cmd)
     
+@active_if(not args.only_assembly)
 @transform(r2c_bwa_index,
            formatter(),
            "{path[0]}/r2c.bam",
@@ -354,7 +360,8 @@ def concat_fasta(gene_fastas, single_merged_fasta):
     else:
         source = os.path.relpath(gene_fastas[0], os.path.dirname(single_merged_fasta))
         os.symlink(source, single_merged_fasta)
-    
+
+@active_if(not args.only_assembly)
 @merge(r2c,
        '%s/r2c.bam' % assembly_outdir,
        args.sort_mem)
@@ -400,6 +407,7 @@ def r2c_cleanup():
         if os.path.exists(temp_file):
             os.remove(temp_file)
 
+@active_if(not args.only_assembly)
 @posttask(r2c_cleanup)
 @transform(r2c_concat,
            suffix('.bam'),
@@ -408,6 +416,7 @@ def r2c_index_concat(r2c_cat_sorted_bam, r2c_cat_sorted_bam_index):
     cmd = 'samtools index %s' % r2c_cat_sorted_bam
     run_cmd(cmd)
            
+@active_if(not args.only_assembly)
 @transform(concat_fasta,
            formatter(".+.fa$"),
            "{path[0]}/c2g.bam",
@@ -424,6 +433,7 @@ def c2g(contigs_fasta, c2g_bam, gmap_index, nthreads):
     else:
         run_cmd('touch %s' % c2g_bam)
     
+@active_if(not args.only_splicing and not args.only_assembly)
 @transform(concat_fasta,
            formatter(".+.fa$"),
            "{path[0]}/c2t.bam",
@@ -439,31 +449,59 @@ def c2t(contigs_fasta, c2t_bam, bwa_index, nthreads):
     else:
         run_cmd('touch %s' % c2t_bam)
     
+@active_if(not args.only_splicing and not args.only_assembly)
 @follows(mkdir(pvt_outdir))
 @merge([concat_fasta, c2g, c2t, r2c_index_concat],
-       pvt_outdir + '/events.bedpe',
+       pvt_outdir + '/sv.bedpe',
        args.bwa_index,
        args.gmap_index,
        args.gtf,
        args.genome_fasta,
        args.nprocs)
-def find_events(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fasta, nprocs):
+def find_sv(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fasta, nprocs):
     merged_fasta, c2g_bam, c2t_bam, r2c_index = inputs
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'find_events.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s --nproc %d %s %s %s %s' % (c2g_bam,
-                                                                                                                               c2t_bam,
-                                                                                                                               transcripts_index,
-                                                                                                                               ' '.join(gmap_index),
-                                                                                                                               os.path.splitext(r2c_index)[0],
-                                                                                                                               nprocs,
-                                                                                                                               merged_fasta,
-                                                                                                                               gtf,
-                                                                                                                               genome_fasta,
-                                                                                                                               os.path.dirname(events_output)
-                                                                                                                               )
+        cmd = 'find_sv.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s --nproc %d %s %s %s %s' % (c2g_bam,
+                                                                                                                           c2t_bam,
+                                                                                                                           transcripts_index,
+                                                                                                                           ' '.join(gmap_index),
+                                                                                                                           os.path.splitext(r2c_index)[0],
+                                                                                                                           nprocs,
+                                                                                                                           merged_fasta,
+                                                                                                                           gtf,
+                                                                                                                           genome_fasta,
+                                                                                                                           os.path.dirname(events_output)
+                                                                                                                           )
         run_cmd(cmd)
     else:
         run_cmd('touch %s' % events_output)
+
+@active_if(not args.only_sv and not args.only_assembly)
+@follows(mkdir(pvt_outdir))
+@merge([concat_fasta, c2g, r2c_index_concat],
+       ['%s/%s' % (pvt_outdir, ff) for ff in ('novel_splicing.bedpe', 'mappings.tsv', 'junctions.bed')],
+       args.gtf,
+       args.genome_fasta,
+       args.nprocs,
+       args.suppl_annot)
+def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot):
+    merged_fasta, c2g_bam, r2c_index = inputs
+    if os.path.getsize(merged_fasta) > 0:
+        cmd = 'map_splice.py %s %s %s %s %s --r2c %s --nproc %d' % (c2g_bam,
+                                                                    merged_fasta,
+                                                                    gtf,
+                                                                    genome_fasta,
+                                                                    pvt_outdir,
+                                                                    os.path.splitext(r2c_index)[0],
+                                                                    nprocs)
+
+        if suppl_annot:
+            cmd += ' --suppl_annot %s' % suppl_annot
+
+        run_cmd(cmd)
+    else:
+        for output in outputs:
+            run_cmd('touch %s' % output)
 
 pipeline_printout(sys.stdout, verbose=3)
 pipeline_run(verbose=3, multiprocess=args.nprocs, logger=logger)
