@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import pavfinder_transcriptome as pvt
 from ruffus import *
 import ruffus.cmdline as cmdline
 import subprocess
@@ -57,6 +58,25 @@ def fill_annotation_args(args):
                 setattr(args, name, value)
             else:
                 setattr(args, name, value.split(' '))
+                
+def get_version(exe):
+    version = None
+    cmd = None
+    if exe == 'bbt':
+        cmd = 'biobloomcategorizer --version'
+        re.compile(r'(\d+\.\d+\.\d+[a-z])')
+    elif exe == 'transabyss':
+        cmd = 'transabyss --version'
+    elif exe == 'pvt':
+        version = pvt.__version__
+        
+    if cmd is not None:
+        stdout, stderr = run_cmd(cmd)
+        match = re.search(r'(\d+\.\d+\.\d+[a-z]?)', stderr)
+        if match:
+            version = match.group(1)
+            
+    return version
 
 parser = cmdline.get_argparse(description='TAP pipeline')
 parser.add_argument('sample', type=str, help='sample name')
@@ -98,9 +118,9 @@ if args.fq:
 elif args.fq_list:
     read_pairs = format_read_pairs(list_file=args.fq_list)
 
-bbt_outdir = '%s/bbt_v3.0.0b' % args.outdir
-assembly_outdir = '%s/transabyss_v1.5.4' % args.outdir
-pvt_outdir = '%s/pvt_v0.3.0' % args.outdir
+bbt_outdir = '%s/bbt_%s' % (args.outdir, get_version('bbt'))
+assembly_outdir = '%s/transabyss_%s' % (args.outdir, get_version('transabyss'))
+pvt_outdir = '%s/pvt_%s' % (args.outdir, get_version('pvt'))
 
 bbt_prefix = bbt_outdir + '/' + args.sample
 
