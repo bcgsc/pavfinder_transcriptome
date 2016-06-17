@@ -156,7 +156,17 @@ class ExonMapper:
 	out.close()
 	
     @classmethod
-    def output_events(cls, events, out_file):
+    def output_events(cls, events, out_file, header=None):
+	def create_bedpe_header():
+	    cols = []
+	    for i in {1,2}:
+		for label in {'chrom', 'start', 'end'}:
+		    cols.append('%s%d' % (label, i))
+	    for label in ('name', 'score', 'strand1', 'strand2'):
+		cols.append(label)
+
+	    return cols + report_items.keys()
+
 	def group_events():
 	    grouped_events = defaultdict(list)
 	    for event in events:
@@ -194,7 +204,13 @@ class ExonMapper:
 	               'retained_intron'
 	               ]
 	out = open(out_file, 'w')
-	out.write('%s\n' % '\t'.join(report_items))
+	if header is not None:
+	    if type(header) is str:
+		out.write('#%s\n' % header)
+	    elif type(header) is tuple or type(header) is list:
+		for h in header:
+		    out.write('#%s\n' % h)
+	out.write('%s\n' % '\t'.join(create_bedpe_header()))
 	events_ordered = group_events()
 
 	counter = 1
