@@ -6,11 +6,7 @@ from collections import OrderedDict
 from copy import deepcopy
 
 report_items = OrderedDict(
-        [('ID', None),
-         ('event', 'event'),
-         ('chrom', 'chroms,0'),
-         ('start', 'genome_breaks,0'),
-         ('end', 'genome_breaks,1'),
+        [('event', 'event'),
          ('gene', None),
          ('transcript', None),
          ('size', 'size'),
@@ -230,13 +226,22 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	    	
 def report(event, event_id=None):
     data = []
+
+    data.append(event.chroms[0])
+    data.append(event.genome_breaks[0] - 1)
+    data.append(event.genome_breaks[0])
+    data.append(event.chroms[0])
+    data.append(event.genome_breaks[1])
+    data.append(event.genome_breaks[1] + 1)
+    data.append(event_id)
+    data.append('.')
+    data.append('+')
+    data.append('+')
+
     for item, label in report_items.iteritems():
 	value = 'na'
-	if item == "ID":
-	    if event_id is not None:
-		value = event_id
 		
-	elif label is not None and ',' in label:
+	if label is not None and ',' in label:
 	    attr, index = label.split(',')
 	    if hasattr(event, attr):
 		values = getattr(event, attr)
@@ -257,7 +262,7 @@ def report(event, event_id=None):
 		
 	data.append(str(value))
 
-    return '\t'.join(data)
+    return '\t'.join(map(str, data))
     
 def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta, min_intron_size=20, 
                             known_juncs=None, known_exons=None, no_indel=True):
