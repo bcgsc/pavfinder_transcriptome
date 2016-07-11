@@ -50,8 +50,6 @@ def get_orfs(sequence, frames=None, only_strand=None, min_size=1):
                     orf = translation[start:stop]
                     seq_start = prot2nuc_coord(start, frame, strand, start=True)
                     seq_end = prot2nuc_coord(stop - 1, frame, strand)
-                    #seq_seq = get_seq((seq_start, seq_end))
-                    #print 'gggg', start, stop, orf, seq_start, seq_end, seq_seq, len(seq_seq)
                     start = stop + 1
                     if len(orf) > min_size:
                         all_orfs.append((seq_start, seq_end, strand, frame, orf))
@@ -61,8 +59,6 @@ def get_orfs(sequence, frames=None, only_strand=None, min_size=1):
                     orf = translation[start:stop]
                     seq_start = prot2nuc_coord(start, frame, strand, start=True)
                     seq_end = prot2nuc_coord(stop - 1, frame, strand)
-                    #seq_seq = get_seq((seq_start, seq_end))
-                    #print 'gggg end', start, stop, orf, seq_start, seq_end, seq_seq, len(seq_seq)
                     if len(orf) > min_size:
                         all_orfs.append((seq_start, seq_end, strand, frame, orf))
             else:
@@ -91,14 +87,11 @@ def check_frame(query_seq, seq_breaks, genome_breaks, genome_fasta, transcripts,
 		else:
 		    return False
 	else:
-	    #print 'aa', transcripts[0], transcripts[0].id, transcripts[0].gene, seq_breaks, query_seq
-	    #print 'bb', transcripts[0].get_sequence(genome_fasta, cds_only=True)
 	    in_frame = is_inframe(transcripts[0],
 		                  transcripts[1],
 		                  seq_breaks,
 		                  query_seq,
 		                  genome_fasta)
-	    #print 'yy2', transcripts[0].gene, transcripts[1].gene, in_frame
     return in_frame
 
 def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
@@ -117,17 +110,12 @@ def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
                   novel_amino acid in between)
     """
     max_aa_len_test = 5
-    #print 'abc', txt5.gene, txt3.gene, txt5.id, txt3.id
     orf5 = get_orfs(txt5.get_sequence(genome_fasta, cds_only=True), frames=[0], only_strand='+')[0][-1]
     orf3 = get_orfs(txt3.get_sequence(genome_fasta, cds_only=True), frames=[0], only_strand='+')[0][-1]
     
-    #print 'orf5', orf5
-    #print 'orf3', orf3
     query_orfs = get_orfs(query_seq)
     for orf in query_orfs:
         orf_coords = sorted(orf[:2])
-        #print 'orf', query_breaks, orf, orf_coords, query_seq[orf_coords[0]:orf_coords[1] + 1]
-        #print len(orf[-1]), len(query_seq[orf_coords[0]:orf_coords[1] + 1])
         
         if orf[2] == '-':
             orf_start, orf_end = len(query_seq) - orf[0], len(query_seq) - orf[1]
@@ -136,10 +124,8 @@ def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
             orf_start, orf_end = orf[0] + 1, orf[1] + 1
             break_start, break_end = query_breaks[0], query_breaks[1]
             
-        #print 'aaa', orf_start, orf_end, break_start, break_end
         if orf_start < break_start and orf_end > break_end:
             ctg_breaks_aa = int(ceil((break_start - orf_start) / 3.0)), int(ceil((break_end - orf_start) / 3.0)) + 1
-            #print 'aa', ctg_breaks_aa, orf[-1][ctg_breaks_aa[0]:ctg_breaks_aa[1] - 1], ctg_breaks_aa[0], ctg_breaks_aa[1]
             if ctg_breaks_aa[1] - ctg_breaks_aa[0] > 1:
                 novel_aa = orf[-1][ctg_breaks_aa[0]:ctg_breaks_aa[1] - 1]
             else:
@@ -154,21 +140,13 @@ def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
             up_orf_test = up_orf[-1 * min(max_aa_len_test, len(up_orf)):]
             down_orf_test = down_orf[:min(max_aa_len_test, len(down_orf))]
             
-            #print 'up_orf', up_orf, up_orf_test, up_orf_test in orf5
-            #print 'down_orf', down_orf, down_orf_test, down_orf_test in orf3
-            
             if up_orf_test in orf5 and down_orf_test in orf3:
                 match5 = re.search(up_orf_test, orf5)
-                #print 'match5', match5.start(), match5.end()              
                 aa5 = match5.end()
-                #print 'abc', orf5[:aa5]
                                     
                 match3 = re.search(down_orf_test, orf3)
-                #print 'match3', match3.start(), match3.end()
                 aa3 = match3.start() + 1
-                #print 'abc', orf3[aa3 - 1:]
                 
-                #print 'final', aa5, aa3, novel_aa, orf5[aa5-3:aa5], orf3[aa3-1:aa3+2]
                 return (aa5, aa3, novel_aa)
                 
     return False
