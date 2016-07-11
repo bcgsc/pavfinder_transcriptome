@@ -19,17 +19,35 @@ class Transcript:
 	self.exons.append(exon)
 	self.exons.sort(key=lambda e: int(e[0]))
 	    
-    def exon(self, num):
+    def exon(self, num, transcript_coord=False):
 	assert type(num) is int, 'exon number %s not given in int' % num
 	assert self.strand == '+' or self.strand == '-', 'transcript strand not valid: %s %s' % (self.id, self.strand)
 	
 	if num < 1 or num > len(self.exons):
 	    print 'exon number out of range:%s (1-%d)' % (num, len(self.exons))
 	    return None
-	if self.strand == '+':
-	    return self.exons[num - 1]
+
+	if not transcript_coord:
+	    if self.strand == '+':
+		return self.exons[num - 1]
+	    else:
+		return self.exons[len(self.exons) - num]
 	else:
-	    return self.exons[len(self.exons) - num]
+	    return self.exons_in_transcript_coords()[num - 1]
+
+    def exons_in_transcript_coords(self):
+	"""Returns exons in transcript coordinates"""
+	if self.strand == '+':
+	    blocks = self.exons
+	else:
+	    blocks = self.exons[::-1]
+
+	exons = []
+	start = 1
+	for block in blocks:
+	    exons.append([start, start + block[1] - block[0]])
+	    start = exons[-1][1] + 1
+	return exons
 	
     def num_exons(self):
 	return len(self.exons)
