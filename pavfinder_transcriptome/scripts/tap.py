@@ -516,7 +516,7 @@ def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot):
                                                                     nprocs)
 
         if suppl_annot:
-            cmd += ' --suppl_annot %s' % suppl_annot
+            cmd += ' --suppl_annot %s' % ' '.join(suppl_annot)
 
         run_cmd(cmd)
     else:
