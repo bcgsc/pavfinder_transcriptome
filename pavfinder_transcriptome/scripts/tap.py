@@ -331,7 +331,7 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
     run_cmd(cmd)
     
 def bbt_cleanup():
-    if not args.remove_fq:
+    if args.remove_fq:
         temp_files = []
         for ff in glob.glob('%s/*.fastq' % bbt_outdir):
             temp_files.append(ff)
@@ -421,7 +421,7 @@ def concat_fasta(gene_fastas, single_merged_fasta):
 def r2c_concat(r2c_bams, r2c_cat_bam, sort_mem):
     header_file = '%s/r2c_cat.header' % assembly_outdir
     sam_file = '%s/r2c_cat.sam' % assembly_outdir
-    if args.bf and len(r2c_bams) > 1:
+    if len(r2c_bams) > 1:
         with open(header_file, 'w') as header, open(sam_file, 'w') as sam:
             for i in range(len(r2c_bams)):
                 if os.path.getsize(r2c_bams[i]) == 0:
@@ -443,7 +443,7 @@ def r2c_concat(r2c_bams, r2c_cat_bam, sort_mem):
 
         run_cmd('/bin/bash -c "%s"' % cmd)
 
-    elif not args.bf and len(r2c_bams) == 1:
+    elif len(r2c_bams) == 1:
         source = os.path.relpath(r2c_bams[0], os.path.dirname(r2c_cat_bam))
         os.symlink(source, r2c_cat_bam)
 
@@ -453,8 +453,11 @@ def r2c_cleanup():
         temp_files.append(ff)
 
     if args.bf:
+        r2c_bams = []
         for ff in glob.glob('%s/*/r2c.bam' % assembly_outdir):
-            temp_files.append(ff)
+            r2c_bams.append(ff)
+        if len(r2c_bams) > 1:
+            temp_files.extend(r2c_bams)
 
     for temp_file in temp_files:
         if os.path.exists(temp_file):
