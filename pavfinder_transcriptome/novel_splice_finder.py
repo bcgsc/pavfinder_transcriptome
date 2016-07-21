@@ -72,13 +72,25 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 	                event = event['event'],
 	                size = event['size']
 	                )
-	if event.has_key('exons') and event['exons']:
+
+	if event['event'] == 'skipped_exon':
+	    adj.exons = (transcript.coord_to_exon(event['pos'][0]),
+	                 transcript.coord_to_exon(event['pos'][1]))
+	elif event['event'] == 'novel_exon':
+	    exon1 = transcript.coord_to_exon(event['pos'][0])
+	    exon2 = transcript.coord_to_exon(event['pos'][1])
+	    if exon1 is None and exon2 is not None:
+		adj.exons = ('na', exon2)
+	    elif exon1 is not None and exon2 is None:
+		adj.exons = (exon1, 'na')
+	else:
 	    if len(event['exons']) == 1:
 		adj.exons = (transcript.exon_num(event['exons'][0]),
-		             transcript.exon_num(event['exons'][0]))
+	                     transcript.exon_num(event['exons'][0]))
 	    else:
 		adj.exons = (transcript.exon_num(event['exons'][0]),
-		             transcript.exon_num(event['exons'][1]))
+	                     transcript.exon_num(event['exons'][1]))
+
 	if adj.event == 'retained_intron':
 	    adj.set_probe(query_seq)
 	else:
@@ -157,7 +169,6 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 		    e['blocks'] = (i, j)
 		    e['transcript'] = transcript.id
 		    e['seq_breaks'] = [align.query_blocks[i][1], align.query_blocks[j][0]]
-		#all_events.extend([event_to_adj(event) for event in events])
 		all_events.extend(events)
 	    continue
 	
@@ -206,7 +217,6 @@ def find_novel_junctions(matches, align, transcript, query_seq, ref_fasta, acces
 		    e['blocks'] = range(i + 1, j)
 		    e['seq_breaks'] = [align.query_blocks[i][1], align.query_blocks[j][0]]
 		    e['transcript'] = transcript.id
-		#all_events.extend([event_to_adj(event) for event in events])
 		all_events.extend(events)	
 	
     adjs = []
@@ -328,9 +338,10 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		events.append({'event': event, 'exons': [match2[0]], 'pos':pos, 'size':gap_size})
 	    
     else:
-	if match2[0] > match1[0] + 1 and\
-           '=' in match1[1] and\
-           '=' in match2[1]:
+	if match2[0] > match1[0] + 1:
+	#if match2[0] > match1[0] + 1 and\
+           #'=' in match1[1] and\
+           #'=' in match2[1]:
 	    size = 0
 	    for e in range(match1[0] + 1, match2[0]):
 		exon = transcript.exons[e]
@@ -365,7 +376,8 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 		    events.append({'event': event, 'exons': [match1[0]], 'pos':pos})
 	    
 	# novel donor and acceptor
-	if match1[1][1] == '=' and match2[1][0] != '=':
+	if  match2[1][0] != '=':
+	#if match1[1][1] == '=' and match2[1][0] != '=':
 	    size = abs(blocks[1][0] - transcript.exons[match2[0]][0])
 	    if transcript.strand == '+':
 		event = 'novel_acceptor'
@@ -379,7 +391,8 @@ def classify_novel_junction(match1, match2, chrom, blocks, transcript, ref_fasta
 	    if check_splice_motif(chrom, donor_start, acceptor_start, transcript.strand, ref_fasta):
 		events.append({'event': event, 'exons': [match1[0], match2[0]], 'pos':pos, 'size':size})
 		
-	if match1[1][1] != '=' and match2[1][0] == '=':
+	if match1[1][1] != '=':
+	#if match1[1][1] != '=' and match2[1][0] == '=':
 	    size = abs(blocks[0][1] - transcript.exons[match1[0]][1])
 	    if transcript.strand == '+':
 		event = 'novel_donor'
