@@ -96,6 +96,9 @@ parser.add_argument('--gtf', type=str, help='gtf')
 parser.add_argument('--sort_mem', type=str, help='samtools sort memory. Default:5G', default='5G')
 parser.add_argument('--genome_fasta', type=str, help='genome fasta')
 parser.add_argument("--suppl_annot", type=str, nargs="+", help="supplementary annotation file(s) for checking novel splice events")
+parser.add_argument('--min_support_sv', type=int, help="minimum read support for sv events. Default:4", default=4)
+parser.add_argument('--min_support_splice', type=int, help="minimum read support for novel splicing events. Default:4", default=4)
+parser.add_argument('--remove_fq', action='store_true', help='remove intermediate fastqs')
 
 args = parser.parse_args()
 fill_annotation_args(args)
@@ -154,6 +157,23 @@ def classify(paired_fqs, bbt_output, prefix, bf, nthreads):
 
     run_cmd('/bin/bash -c "%s"' % cmd)
     
+def format_read_pairs(lines):
+    """format reads to '/1' and '/2' for abyss"""
+    read_name1 = lines[0].split()[0]
+    read_name2 = lines[4].split()[0]
+
+    if not (read_name1[-2:] == '/1' and read_name2[-2:] == '/2'):
+        if read_name1 == read_name2:
+            lines[0] = lines[0].replace(read_name1, read_name1 + '/1', 1)
+            lines[4] = lines[4].replace(read_name2, read_name2 + '/2', 1)
+
+        elif read_name1[-1] == '1' and read_name2[-1] == '2' and\
+             not read_name1[-2].isalnum() and not read_name2[-2].isalnum():
+            lines[0] = lines[0].replace(read_name1, read_name1[:-2] + '/' + read_name1[-1:], 1)
+            lines[4] = lines[4].replace(read_name2, read_name2[:-2] + '/' + read_name2[-1:], 1)
+
+    return lines
+
 @split(classify,
        bbt_outdir + '/*.fastq*')
 def split_input(bbt_fastq, split_fastqs, genes=None):
@@ -164,6 +184,7 @@ def split_input(bbt_fastq, split_fastqs, genes=None):
         with open(bbt_fastq[0], 'r') as fq:
             for lines in itertools.izip_longest(*[fq]*8):
                 target = lines[0].rstrip().split(' ')[1].split('.')[0]
+                lines = format_read_pairs(list(lines))
                 seqs1[target].extend(lines[:4])
                 seqs2[target].extend(lines[-4:])
 
@@ -309,6 +330,18 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
 
     run_cmd(cmd)
     
+def bbt_cleanup():
+    if not args.remove_fq:
+        temp_files = []
+        for ff in glob.glob('%s/*.fastq' % bbt_outdir):
+            temp_files.append(ff)
+        for ff in glob.glob('%s/*.fq' % bbt_outdir):
+            temp_files.append(ff)
+
+        for temp_file in temp_files:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+
 @active_if(not args.only_assembly)
 @transform(merge_assemblies,
            formatter(".+-merged.fa"),
@@ -429,6 +462,7 @@ def r2c_cleanup():
 
 @active_if(not args.only_assembly)
 @posttask(r2c_cleanup)
+@posttask(bbt_cleanup)
 @transform(r2c_concat,
            suffix('.bam'),
            '.bam.bai')
@@ -477,21 +511,23 @@ def c2t(contigs_fasta, c2t_bam, bwa_index, nthreads):
        args.gmap_index,
        args.gtf,
        args.genome_fasta,
-       args.nprocs)
-def find_sv(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fasta, nprocs):
+       args.nprocs,
+       args.min_support_sv)
+def find_sv(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fasta, nprocs, min_support):
     merged_fasta, c2g_bam, c2t_bam, r2c_index = inputs
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'find_sv.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s --nproc %d %s %s %s %s' % (c2g_bam,
-                                                                                                                           c2t_bam,
-                                                                                                                           transcripts_index,
-                                                                                                                           ' '.join(gmap_index),
-                                                                                                                           os.path.splitext(r2c_index)[0],
-                                                                                                                           nprocs,
-                                                                                                                           merged_fasta,
-                                                                                                                           gtf,
-                                                                                                                           genome_fasta,
-                                                                                                                           os.path.dirname(events_output)
-                                                                                                                           )
+        cmd = 'find_sv.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s --nproc %d --min_support %d %s %s %s %s' % (c2g_bam,
+                                                                                                                                            c2t_bam,
+                                                                                                                                            transcripts_index,
+                                                                                                                                            ' '.join(gmap_index),
+                                                                                                                                            os.path.splitext(r2c_index)[0],
+                                                                                                                                            nprocs,
+                                                                                                                                            min_support,
+                                                                                                                                            merged_fasta,
+                                                                                                                                            gtf,
+                                                                                                                                            genome_fasta,
+                                                                                                                                            os.path.dirname(events_output)
+                                                                                                                                            )
         run_cmd(cmd)
     else:
         run_cmd('touch %s' % events_output)
@@ -503,17 +539,19 @@ def find_sv(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fa
        args.gtf,
        args.genome_fasta,
        args.nprocs,
-       args.suppl_annot)
-def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot):
+       args.suppl_annot,
+       args.min_support_splice)
+def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot, min_support):
     merged_fasta, c2g_bam, r2c_index = inputs
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'map_splice.py %s %s %s %s %s --r2c %s --nproc %d' % (c2g_bam,
-                                                                    merged_fasta,
-                                                                    gtf,
-                                                                    genome_fasta,
-                                                                    pvt_outdir,
-                                                                    os.path.splitext(r2c_index)[0],
-                                                                    nprocs)
+        cmd = 'map_splice.py %s %s %s %s %s --r2c %s --nproc %d --min_support %d' % (c2g_bam,
+                                                                                     merged_fasta,
+                                                                                     gtf,
+                                                                                     genome_fasta,
+                                                                                     pvt_outdir,
+                                                                                     os.path.splitext(r2c_index)[0],
+                                                                                     nprocs,
+                                                                                     min_support)
 
         if suppl_annot:
             cmd += ' --suppl_annot %s' % ' '.join(suppl_annot)
