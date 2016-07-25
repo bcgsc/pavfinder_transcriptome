@@ -30,7 +30,7 @@ class SVFinder:
                     gene_mappings=None, external_mappings=None,
                     min_indel_size=0, min_indel_flanking=0,
                     no_utr=False, no_indels=False, no_inv=True,
-                    max_homol_len=5, max_novel_len=5,
+                    max_homol_len=5, max_novel_len=20,
                     only_sense_fusion=True, only_exon_bound_fusion=True,
                     only_coding_fusion=True,
                     ):
