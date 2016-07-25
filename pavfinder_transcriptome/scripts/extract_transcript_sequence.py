@@ -14,9 +14,26 @@ def get_genes(list_file):
             genes.add(line.rstrip('\n'))
     return genes
 
-def get_transcripts(annot, coding_only, genes=None):
+def get_longest(transcripts, coding_first):
+    sorted_by_size = sorted(transcripts, key = lambda transcript: transcript.length(), reverse=True)
+    if coding_first:
+        for transcript in sorted_by_size:
+            if transcript.is_coding():
+                return transcript
+
+    return sorted_by_size[0]
+
+def get_transcripts(annot, coding_only, genes=None, only_longest=False, coding_first=False):
     transcripts_dict = Transcript.extract_transcripts(annot)
-    transcripts = transcripts_dict.values()
+    transcripts = []
+    if only_longest:
+        by_gene = defaultdict(list)
+        for transcript in transcripts_dict.values():
+            by_gene[transcript.gene].append(transcript)
+        for gene in by_gene.keys():
+            transcripts.append(get_longest(by_gene[gene], coding_first))
+    else:
+        transcripts = transcripts_dict.values()
     
     if genes and type(genes) is Set:
         transcripts = [t for t in transcripts if t.gene in genes]
@@ -86,6 +103,8 @@ def parse_args():
     parser.add_argument("--index", action="store_true", help="generate BWA index of output FASTA")
     parser.add_argument("--genomic", action="store_true", help="include genomic sequence")
     parser.add_argument("--output_by_gene", action="store_true", help="output by gene")
+    parser.add_argument("--only_longest", action="store_true", help="only longest transcript")
+    parser.add_argument("--coding_first", action="store_true", help="pick coding over non-coding transcript")
     
     args = parser.parse_args()
     
@@ -96,7 +115,7 @@ def main():
     genes = None
     if args.genes:
         genes = get_genes(args.genes)
-    transcripts = get_transcripts(args.gtf, args.only_coding, genes=genes)
+    transcripts = get_transcripts(args.gtf, args.only_coding, genes=genes, only_longest=args.only_longest, coding_first=args.coding_first)
     
     by_gene = defaultdict(list)
     if args.genomic or args.output_by_gene:
@@ -113,7 +132,7 @@ def main():
         output_single(args.out, transcripts, fasta, genomic_seq=genomic_seq)
     
         if args.index:
-            bwa_index(out_file)
+            bwa_index(args.out)
             
     else:
         if os.path.isdir(args.out):
