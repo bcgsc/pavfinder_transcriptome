@@ -149,7 +149,7 @@ def parse_args():
     filtering.add_argument("--include_non_exon_bound_fusion", action="store_true", help="include non-exon-bound fusions")
     filtering.add_argument("--include_noncoding_fusion", action="store_true", help="include noncoding fusions")
     filtering.add_argument("--max_homol_len", type=int, help="maximum homology sequence length. Default:5", default=5)
-    filtering.add_argument("--max_novel_len", type=int, help="maximum novel sequence length. Default:5", default=5)
+    filtering.add_argument("--max_novel_len", type=int, help="maximum novel sequence length. Default:20", default=20)
     filtering.add_argument("--subseq_len", type=int, help="subsequence length for filtering. Default:50", default=50)
     filtering.add_argument("--probe_len", type=int, help="probe sequence length for filtering. Default:100", default=100)
 
@@ -194,8 +194,8 @@ def main():
                                                                       min_indel_size=args.min_indel_size,
                                                                       min_indel_flanking=args.min_indel_flanking,
                                                                       no_utr=args.no_utr,
-                                                                      max_homol_len=args.max_novel_len,
-                                                                      max_novel_len=args.max_homol_len,
+                                                                      max_novel_len=args.max_novel_len,
+                                                                      max_homol_len=args.max_homol_len,
                                                                       only_sense_fusion=not args.include_nonsense_fusion,
                                                                       only_exon_bound_fusion=not args.include_non_exon_bound_fusion,
                                                                       only_coding_fusion=not args.include_noncoding_fusion
@@ -211,8 +211,8 @@ def main():
                                                                                 min_indel_flanking=args.min_indel_flanking,
                                                                                 no_utr=args.no_utr,
                                                                                 no_indels=True,
-                                                                                max_homol_len=args.max_novel_len,
-                                                                                max_novel_len=args.max_homol_len,
+                                                                                max_novel_len=args.max_novel_len,
+                                                                                max_homol_len=args.max_homol_len,
                                                                                 only_sense_fusion=not args.include_nonsense_fusion,
                                                                                 only_exon_bound_fusion=not args.include_non_exon_bound_fusion,
                                                                                 only_coding_fusion=not args.include_noncoding_fusion
