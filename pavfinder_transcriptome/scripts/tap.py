@@ -12,6 +12,10 @@ import re
 import fileinput
 import datetime
 import itertools
+from ConfigParser import ConfigParser
+
+required_params = {'sv': ['genome_fasta', 'gtf', 'transcripts_fasta', 'genome_index'],
+                   'splice': ['genome_fasta', 'gtf']}
 
 def run_cmd(cmd, force=False):
     process = subprocess.Popen(cmd,
@@ -44,20 +48,6 @@ def format_read_pairs(fqs=None, list_file=None):
         raise Exception('input fastqs not paired')
     
     return fastqs1, fastqs2
-
-def fill_annotation_args(args):
-    names = ('gmap_index', 'bwa_index', 'gtf', 'genome_fasta')
-    for name in names:
-        if getattr(args, name) is None and (os.environ.get(name) is not None or os.environ.get(name.upper()) is not None):
-            if os.environ.get(name):
-                value = os.environ.get(name)
-            else:
-                value = os.environ.get(name.upper())
-
-            if not ' ' in value:
-                setattr(args, name, value)
-            else:
-                setattr(args, name, value.split(' '))
                 
 def get_version(exe):
     version = None
@@ -78,30 +68,83 @@ def get_version(exe):
             
     return version
 
+def get_params(args, params_file):
+    def override(section, names):
+        for name in names:
+            value = getattr(args, name)
+            if not params.has_key(section):
+                params[section] = {}
+            if not params[section].has_key(name) or value is not None:
+                params[section][name] = value
+
+    params = {}
+    if params_file is not None and os.path.exists(params_file):
+        cfg = ConfigParser()
+        cfg.read(params_file)
+        for section in cfg.sections():
+            params[section] = {}
+            for option in cfg.options(section):
+                value = cfg.get(section, option)
+                if value.lower() in ('true', 'false'):
+                    if value.lower() == 'true':
+                        value = True
+                    else:
+                        value = False
+                elif ' ' in value:
+                    value = value.split()
+                params[section][option] = value
+
+    override('alignments', ('genome_index', 'transcripts_fasta', 'sort_mem'))
+    override('annotations', ('genome_fasta', 'gtf', 'suppl_annot'))
+
+    return params
+
+def check_params(args, params):
+    error = None
+    if not args.only_assembly:
+        if not params.has_key('alignments'):
+            error = 'no alignments parameters provided'
+        elif not params['alignments'].has_key('genome_index') or params['alignments']['genome_index'] is None or\
+             type(params['alignments']['genome_index']) is not list or len(params['alignments']['genome_index']) != 2:
+            error = 'no proper GMAP index provided'
+        elif not params['annotations'].has_key('genome_fasta') or params['annotations']['genome_fasta'] is None:
+            error = 'no genome fasta provided'
+        elif not params['annotations'].has_key('gtf') or params['annotations']['gtf'] is None:
+            error = 'no gtf provided'
+
+        if not args.only_splicing:
+            if not params['alignments'].has_key('transcripts_fasta') or params['alignments']['transcripts_fasta'] is None:
+                error = 'no transcripts fasta provided'
+
+    if error is not None:
+        sys.exit('TAP ABORTED: %s' % error.upper())
+
 parser = cmdline.get_argparse(description='TAP pipeline')
 parser.add_argument('sample', type=str, help='sample name')
 parser.add_argument('outdir', type=str, help='output directory')
 parser.add_argument('--bf', type=str, help='path to bloomfilter')
 parser.add_argument('--fq', type=str, nargs='+', help='input gzipped fastqs')
 parser.add_argument('--fq_list', type=str, help='text file of input fastq paths')
-parser.add_argument('--nprocs', type=int, default=64, help='number of threads/processes')
+parser.add_argument('--nprocs', type=int, default=32, help='number of threads/processes. Default=32')
 parser.add_argument('--k', type=int, nargs='+', help='k sizes for assembly')
 parser.add_argument('--readlen', type=int, help='read length')
+parser.add_argument('--remove_fq', action='store_true', help='remove intermediate fastqs')
 parser.add_argument('--only_assembly', action='store_true')
 parser.add_argument('--only_sv', action='store_true')
 parser.add_argument('--only_splicing', action='store_true')
-parser.add_argument('--gmap_index', type=str, nargs=2, help='gmap index')
-parser.add_argument('--bwa_index', type=str, help='bwa index of transcript sequences')
-parser.add_argument('--gtf', type=str, help='gtf')
-parser.add_argument('--sort_mem', type=str, help='samtools sort memory. Default:5G', default='5G')
-parser.add_argument('--genome_fasta', type=str, help='genome fasta')
-parser.add_argument("--suppl_annot", type=str, nargs="+", help="supplementary annotation file(s) for checking novel splice events")
-parser.add_argument('--min_support_sv', type=int, help="minimum read support for sv events. Default:4", default=4)
-parser.add_argument('--min_support_splice', type=int, help="minimum read support for novel splicing events. Default:4", default=4)
-parser.add_argument('--remove_fq', action='store_true', help='remove intermediate fastqs')
+parser.add_argument('--params', type=str, help='parameters file')
+alignments = parser.add_argument_group('alignments')
+alignments.add_argument('--genome_index', type=str, nargs=2, help='gmap index')
+alignments.add_argument('--transcripts_fasta', type=str, help='bwa index of transcript sequences')
+alignments.add_argument('--sort_mem', type=str, help='samtools sort memory. Default:5G', default='5G')
+annotations = parser.add_argument_group('annotations')
+annotations.add_argument('--genome_fasta', type=str, help='genome fasta')
+annotations.add_argument('--gtf', type=str, help='gtf')
+annotations.add_argument("--suppl_annot", type=str, nargs="+", help="supplementary annotation file(s) for checking novel splice events")
 
 args = parser.parse_args()
-fill_annotation_args(args)
+params = get_params(args, args.params)
+check_params(args, params)
 
 logs_dir = args.outdir + '/logs'
 if not os.path.exists(logs_dir):
@@ -310,7 +353,7 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
     else:
         prefixes = ' '.join(['k%d.' % k for k in ks])
     
-    merged_fasta = '/' + '/'.join(filter(None, k_assemblies[0].split(os.sep))[:-2]) + '/%s-merged.fa' % gene
+    merged_fasta = '/'.join(filter(None, k_assemblies[0].split(os.sep))[:-2]) + '/%s-merged.fa' % gene
     
     # check if we have all empty assemblies
     num_empty_assemblies = 0
@@ -360,8 +403,8 @@ def r2c_bwa_index(merged_fasta, index):
            formatter(),
            "{path[0]}/r2c.bam",
            args.nprocs,
-           args.sort_mem)
-def r2c(index, r2c_bam, nthreads, sort_mem):
+           )
+def r2c(index, r2c_bam, nthreads):
     # extract reads1 and reads2 paths
     prefix = os.path.basename(os.path.dirname(index))
     reads1 = []
@@ -394,7 +437,7 @@ def r2c(index, r2c_bam, nthreads, sort_mem):
                                                                                             os.path.splitext(index)[0],
                                                                                             reads1_str,
                                                                                             reads2_str,
-                                                                                            sort_mem,
+                                                                                            params['alignments']['sort_mem'],
                                                                                             os.path.splitext(r2c_bam)[0])
     else:
         cmd = 'touch %s' % r2c_bam
@@ -417,8 +460,8 @@ def concat_fasta(gene_fastas, single_merged_fasta):
 @active_if(not args.only_assembly)
 @merge(r2c,
        '%s/r2c.bam' % assembly_outdir,
-       args.sort_mem)
-def r2c_concat(r2c_bams, r2c_cat_bam, sort_mem):
+       )
+def r2c_concat(r2c_bams, r2c_cat_bam):
     header_file = '%s/r2c_cat.header' % assembly_outdir
     sam_file = '%s/r2c_cat.sam' % assembly_outdir
     if len(r2c_bams) > 1:
@@ -438,7 +481,7 @@ def r2c_concat(r2c_bams, r2c_cat_bam, sort_mem):
 
         cmd = 'cat %s %s | samtools view -Su - | samtools sort -m %s - %s' % (header_file,
                                                                               sam_file,
-                                                                              sort_mem,
+                                                                              params['alignments']['sort_mem'],
                                                                               os.path.splitext(r2c_cat_bam)[0])
 
         run_cmd('/bin/bash -c "%s"' % cmd)
@@ -477,12 +520,12 @@ def r2c_index_concat(r2c_cat_sorted_bam, r2c_cat_sorted_bam_index):
 @transform(concat_fasta,
            formatter(".+.fa$"),
            "{path[0]}/c2g.bam",
-           args.gmap_index,
+           args.genome_index,
            args.nprocs)
-def c2g(contigs_fasta, c2g_bam, gmap_index, nthreads):
+def c2g(contigs_fasta, c2g_bam, genome_index, nthreads):
     if os.path.getsize(contigs_fasta) > 0:
-        cmd = 'gmap -D %s -d %s %s -t %d -f samse -n 0 -x 10 | samtools view -bhS - -o %s' % (gmap_index[0],
-                                                                                              gmap_index[1],
+        cmd = 'gmap -D %s -d %s %s -t %d -f samse -n 0 -x 10 | samtools view -bhS - -o %s' % (params['alignments']['genome_index'][0],
+                                                                                              params['alignments']['genome_index'][1],
                                                                                               contigs_fasta,
                                                                                               nthreads,
                                                                                               c2g_bam)
@@ -494,12 +537,11 @@ def c2g(contigs_fasta, c2g_bam, gmap_index, nthreads):
 @transform(concat_fasta,
            formatter(".+.fa$"),
            "{path[0]}/c2t.bam",
-           args.bwa_index,
            args.nprocs)
-def c2t(contigs_fasta, c2t_bam, bwa_index, nthreads):
+def c2t(contigs_fasta, c2t_bam, nthreads):
     if os.path.getsize(contigs_fasta) > 0:
         cmd = 'bwa mem -t %d %s %s | samtools view -bhS - -o %s' % (nthreads,
-                                                                    bwa_index,
+                                                                    params['alignments']['transcripts_fasta'],
                                                                     contigs_fasta,
                                                                     c2t_bam)
         run_cmd('/bin/bash -c "%s"' % cmd)
@@ -510,27 +552,23 @@ def c2t(contigs_fasta, c2t_bam, bwa_index, nthreads):
 @follows(mkdir(pvt_outdir))
 @merge([concat_fasta, c2g, c2t, r2c_index_concat],
        pvt_outdir + '/sv.bedpe',
-       args.bwa_index,
-       args.gmap_index,
-       args.gtf,
-       args.genome_fasta,
-       args.nprocs,
-       args.min_support_sv)
-def find_sv(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fasta, nprocs, min_support):
+       )
+def find_sv(inputs, events_output):
     merged_fasta, c2g_bam, c2t_bam, r2c_index = inputs
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'find_sv.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s --nproc %d --min_support %d %s %s %s %s' % (c2g_bam,
-                                                                                                                                            c2t_bam,
-                                                                                                                                            transcripts_index,
-                                                                                                                                            ' '.join(gmap_index),
-                                                                                                                                            os.path.splitext(r2c_index)[0],
-                                                                                                                                            nprocs,
-                                                                                                                                            min_support,
-                                                                                                                                            merged_fasta,
-                                                                                                                                            gtf,
-                                                                                                                                            genome_fasta,
-                                                                                                                                            os.path.dirname(events_output)
-                                                                                                                                            )
+        cmd = 'find_sv.py --gbam %s --tbam %s --transcripts_fasta %s --genome_index %s --r2c %s' % (c2g_bam,
+                                                                                                    c2t_bam,
+                                                                                                    params['alignments']['transcripts_fasta'],
+                                                                                                    ' '.join(params['alignments']['genome_index']),
+                                                                                                    os.path.splitext(r2c_index)[0])
+
+        if params.has_key('sv'):
+            sparams = params['sv']
+            cmd += ' %s' % ' '.join(['--%s %s' % (name, sparams[name]) for name in sparams.keys() if type(sparams[name]) is not bool])
+            cmd += ' %s' % ' '.join(['--%s' % name for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True])
+
+        cmd += ' %s' % ' '.join([merged_fasta, params['annotations']['gtf'], params['annotations']['genome_fasta'], os.path.dirname(events_output)])
+
         run_cmd(cmd)
     else:
         run_cmd('touch %s' % events_output)
@@ -542,22 +580,29 @@ def find_sv(inputs, events_output, transcripts_index, gmap_index, gtf, genome_fa
        args.gtf,
        args.genome_fasta,
        args.nprocs,
-       args.suppl_annot,
-       args.min_support_splice)
-def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot, min_support):
+       args.suppl_annot)
+def map_splicing(inputs, outputs, gtf, genome_fasta, nprocs, suppl_annot):
     merged_fasta, c2g_bam, r2c_index = inputs
     if os.path.getsize(merged_fasta) > 0:
-        cmd = 'map_splice.py %s %s %s %s %s --r2c %s --nproc %d --min_support %d' % (c2g_bam,
-                                                                                     merged_fasta,
-                                                                                     gtf,
-                                                                                     genome_fasta,
-                                                                                     pvt_outdir,
-                                                                                     os.path.splitext(r2c_index)[0],
-                                                                                     nprocs,
-                                                                                     min_support)
+        cmd = 'map_splice.py %s %s %s %s %s --r2c %s --nproc %d' % (c2g_bam,
+                                                                    merged_fasta,
+                                                                    params['annotations']['gtf'],
+                                                                    params['annotations']['genome_fasta'],
+                                                                    pvt_outdir,
+                                                                    os.path.splitext(r2c_index)[0],
+                                                                    nprocs,
+                                                                    )
 
-        if suppl_annot:
-            cmd += ' --suppl_annot %s' % ' '.join(suppl_annot)
+        if params.has_key('splicing'):
+            sparams = params['splicing']
+            cmd += ' %s' % ' '.join(['--%s %s' % (name, sparams[name]) for name in sparams.keys() if type(sparams[name]) is not bool])
+            cmd += ' %s' % ' '.join(['--%s' % name for name in sparams.keys() if type(sparams[name]) is bool and sparams[name] == True])
+
+        if params['annotations'].has_key('suppl_annot') and params['annotations']['suppl_annot'] is not None:
+            if type(params['annotations']['suppl_annot']) is str:
+                cmd += ' --suppl_annot %s' % params['annotations']['suppl_annot']
+            elif type(params['annotations']['suppl_annot']) is list or type(params['annotations']['suppl_annot']) is tuple:
+                cmd += ' --suppl_annot %s' % ' '.join(params['annotations']['suppl_annot'])
 
         run_cmd(cmd)
     else:
