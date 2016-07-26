@@ -662,7 +662,8 @@ class SVFinder:
 
 	    if not debug:
 		os.remove(bam.filename)
-		os.remove(query_fa_file)
+	if not debug:
+	    os.remove(query_fa_file)
 	
     def update_adj(self, adj, aligns, query_seq, target_type, block_matches=None):
 	def fix_orients():
