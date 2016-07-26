@@ -41,8 +41,6 @@ def get_orfs(sequence, frames=None, only_strand=None, min_size=1):
             translation = str(nuc[frame:].translate())
             translation_len = len(translation)
             
-            #print 'gg', len(sequence), frame, strand, translation, translation_len
-            
             stops = [i.start() for i in re.finditer("\*", translation)]
             if stops:
                 start = 0
@@ -67,8 +65,6 @@ def get_orfs(sequence, frames=None, only_strand=None, min_size=1):
                 orf = translation
                 seq_start = prot2nuc_coord(start, frame, strand, start=True)
                 seq_end = prot2nuc_coord(stop - 1, frame, strand)
-                #seq_seq = get_seq((seq_start, seq_end))
-                #print 'gggg whole', translation[start:stop], start, stop, seq_start, seq_end, seq_seq, len(seq_seq)
                 if len(orf) > min_size:
                     all_orfs.append((seq_start, seq_end, strand, frame, orf))
 
@@ -139,13 +135,18 @@ def is_inframe(txt5, txt3, query_breaks, query_seq, genome_fasta):
             
             up_orf_test = up_orf[-1 * min(max_aa_len_test, len(up_orf)):]
             down_orf_test = down_orf[:min(max_aa_len_test, len(down_orf))]
+	    down_orf_test1 = down_orf[1:][:min(max_aa_len_test, len(down_orf))]
             
-            if up_orf_test in orf5 and down_orf_test in orf3:
+            if up_orf_test in orf5 and (down_orf_test in orf3 or down_orf_test1 in orf3):
                 match5 = re.search(up_orf_test, orf5)
                 aa5 = match5.end()
                                     
-                match3 = re.search(down_orf_test, orf3)
-                aa3 = match3.start() + 1
+		if down_orf_test in orf3:
+		    match3 = re.search(down_orf_test, orf3)
+		    aa3 = match3.start() + 1
+		else:
+		    match3 = re.search(down_orf_test1, orf3)
+		    aa3 = match3.start() + 1
                 
                 return (aa5, aa3, novel_aa)
                 
