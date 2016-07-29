@@ -365,7 +365,7 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
     else:
         prefixes = ' '.join(['k%d.' % k for k in ks])
     
-    merged_fasta = '/'.join(filter(None, k_assemblies[0].split(os.sep))[:-2]) + '/%s-merged.fa' % gene
+    merged_fasta = '/' + '/'.join(filter(None, os.path.abspath(k_assemblies[0]).split(os.sep))[:-2]) + '/%s-merged.fa' % gene
     
     # check if we have all empty assemblies
     num_empty_assemblies = 0
