@@ -337,10 +337,10 @@ def assemble_single_gene(k_dir, contigs_file, logger, logging_mutex):
     prefix, k = filter(None, k_dir.split(os.sep))[-2:]
     fastqs = ' '.join(open('%s/%s.in' % (k_dir, prefix), 'r').read().split('\n')[:-1])
     
-    cmd = 'transabyss --kmer %s --pe %s --outdir %s --name %s --cleanup 3' % (k.lstrip('k'),
-                                                                              fastqs,
-                                                                              k_dir,
-                                                                              prefix)
+    cmd = 'transabyss --kmer %s --pe %s --outdir %s --name %s --indel 0 --cleanup 3' % (k.lstrip('k'),
+                                                                                        fastqs,
+                                                                                        k_dir,
+                                                                                        prefix)
     stdout_str, stderr_str = run_cmd(cmd, force=True)
 
     if stderr_str and\
