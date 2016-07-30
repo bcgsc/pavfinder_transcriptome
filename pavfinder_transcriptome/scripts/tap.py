@@ -374,12 +374,12 @@ def merge_assemblies(k_assemblies, merged_fasta, readlen):
             num_empty_assemblies += 1
     
     if num_empty_assemblies < len(k_assemblies):
-        cmd = 'transabyss-merge --mink %d --maxk %d --prefixes %s --length %d %s --out %s --force' % (min(ks),
-                                                                                                      max(ks),
-                                                                                                      prefixes,
-                                                                                                      readlen,
-                                                                                                      ' '.join(k_assemblies),
-                                                                                                      merged_fasta)
+        cmd = 'transabyss-merge --mink %d --maxk %d --prefixes %s --length %d %s --out %s --indel 0 --force' % (min(ks),
+                                                                                                                max(ks),
+                                                                                                                prefixes,
+                                                                                                                readlen,
+                                                                                                                ' '.join(k_assemblies),
+                                                                                                                merged_fasta)
     else:
         cmd = 'touch %s' % merged_fasta
 
