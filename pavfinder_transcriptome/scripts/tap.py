@@ -131,13 +131,15 @@ parser.add_argument('--bf', type=str, help='path to bloomfilter')
 parser.add_argument('--fq', type=str, nargs='+', help='input gzipped fastqs')
 parser.add_argument('--fq_list', type=str, help='text file of input fastq paths')
 parser.add_argument('--nprocs', type=int, default=32, help='number of threads/processes. Default=32')
-parser.add_argument('--k', type=int, nargs='+', help='k sizes for assembly')
-parser.add_argument('--readlen', type=int, help='read length')
 parser.add_argument('--remove_fq', action='store_true', help='remove intermediate fastqs')
 parser.add_argument('--only_assembly', action='store_true')
 parser.add_argument('--only_sv', action='store_true')
 parser.add_argument('--only_splicing', action='store_true')
 parser.add_argument('--params', type=str, help='parameters file')
+assembly = parser.add_argument_group('assembly')
+assembly.add_argument('--k', type=int, nargs='+', help='k sizes for assembly')
+assembly.add_argument('--readlen', type=int, help='read length')
+assembly.add_argument('--SS', action='store_true', help='input reads are strand-specific')
 alignments = parser.add_argument_group('alignments')
 alignments.add_argument('--genome_index', type=str, nargs=2, help='gmap index')
 alignments.add_argument('--transcripts_fasta', type=str, help='bwa index of transcript sequences')
@@ -314,7 +316,6 @@ def pair_reads(fastqs, input_file):
 
 @subdivide(pair_reads,
            formatter(),
-           #"{path[0]}/k*",
            ["{path[0]}/k%d" % k for k in args.k],
            args.k)
 def symlink_assembly_input(assembly_input, k_dirs, ks):
@@ -331,8 +332,9 @@ def symlink_assembly_input(assembly_input, k_dirs, ks):
 @transform(symlink_assembly_input,
            formatter(".+/(.+)/(k\d+)"),
            assembly_outdir + "/{1[0]}/{2[0]}/{1[0]}-final.fa",
+           args.SS,
            logger, logging_mutex)
-def assemble_single_gene(k_dir, contigs_file, logger, logging_mutex):
+def assemble_single_gene(k_dir, contigs_file, is_strand_specific, logger, logging_mutex):
     """Assemblies each gene"""
     prefix, k = filter(None, k_dir.split(os.sep))[-2:]
     fastqs = ' '.join(open('%s/%s.in' % (k_dir, prefix), 'r').read().split('\n')[:-1])
@@ -341,6 +343,9 @@ def assemble_single_gene(k_dir, contigs_file, logger, logging_mutex):
                                                                                         fastqs,
                                                                                         k_dir,
                                                                                         prefix)
+    if is_strand_specific:
+        cmd += ' --SS'
+
     stdout_str, stderr_str = run_cmd(cmd, force=True)
 
     if stderr_str and\
