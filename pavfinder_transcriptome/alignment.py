@@ -96,11 +96,9 @@ class Alignment:
 	    if self.query_blocks[0][0] < self.query_blocks[0][1]:
 		if self.query_blocks[0][0] > 1:
 		    seq = query_seq[:self.query_blocks[0][0] - 1]
-		    #clipped.append((seq, 'start'))
 		    clipped['start'] = seq
 		if self.query_blocks[-1][1] < len(query_seq):
 		    seq = query_seq[self.query_blocks[-1][1]:]
-		    #clipped.append((seq, 'end'))
 		    clipped['end'] = seq
 	    # negative
 	    else:
@@ -220,13 +218,6 @@ def reverse_complement(seq):
     from string import maketrans
     complement = maketrans("agtcAGTC", "tcagTCAG")
     return seq[::-1].translate(complement)
-
-#def target_non_canonical(target):
-    #"""Checks if target is non-canonical (haploptypes)"""
-    #if '_' in target:
-	#return True
-    #else:
-	#return False
     
 def compare_chr(chr1, chr2):
     """For sorting chromosome names ignoring 'chr'"""

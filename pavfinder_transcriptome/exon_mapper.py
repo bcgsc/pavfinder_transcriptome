@@ -129,8 +129,6 @@ class ExonMapper:
 	             'E%d' % adj.exons[0],
 	             'E%d' % adj.exons[1],
 	             ]
-	    #if adj.spanning is not None:
-		#label.append(adj.spanning)
 	    cols.append('.'.join(map(str, label)))
 
 	    if adj.spanning is not None:

@@ -558,10 +558,6 @@ class Adjacency:
         return '\n'.join(outputs)
         
     def get_contig_support_span(self, contig_index):
-	#if self.homol_coords and self.homol_coords[contig_index][0] is int and self.homol_coords[contig_index][1] is int:
-	    #return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
-	#else:
-	    #return (self.contig_breaks[contig_index][0], self.contig_breaks[contig_index][1])
 	try:
 	    return (self.homol_coords[contig_index][0], self.homol_coords[contig_index][1])
 	except:

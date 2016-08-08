@@ -367,11 +367,6 @@ def scan_all(coords, bam_file, contig_fasta_file, num_procs, overlap_buffer, per
     support_reads = []
     for batch_result in batch_results:
         for support in batch_result:
-	    # insert sizes
-	    #if len(support) > 7:
-		#tlens_all.extend(support)
-		#continue
-	    
 	    if len(support) == 0:
 		continue
 	    
@@ -381,16 +376,8 @@ def scan_all(coords, bam_file, contig_fasta_file, num_procs, overlap_buffer, per
 		results[contig] = {}
             coords = '%s-%s' % (start, stop)
 	    results[contig][coords] = spanning, flanking
-            #try:
-                ##results[contig][coords] = (spanning, flanking, tiling, support_reads)
-		#results[contig][coords] = spanning
-            #except:
-                #results[contig] = {}
-                ##results[contig][coords] = (spanning, flanking, tiling, support_reads)
-		#results[contig][coords] = spanning
             
     return results
-    #return results, tlens_all
 
 def fetch_support(coords, bam_file, contig_fasta_file, overlap_buffer=0, perfect=False, get_seq=False, debug=False):
     """Fetches read support when number given coords is relatively small
