@@ -27,7 +27,7 @@ setup(
         'biopython',
         ],
     package_data = {'pavfinder_transcriptome': ["test/data/*"]},
-    data_files = [('config', ['cfg/template.cfg'])],
+    data_files = [('config', ['pavfinder_transcriptome/cfg/tap.cfg'])],
     scripts = ['pavfinder_transcriptome/scripts/find_sv.py',
                'pavfinder_transcriptome/scripts/map_splice.py',
                'pavfinder_transcriptome/scripts/tap.py',
