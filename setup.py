@@ -31,5 +31,7 @@ setup(
     scripts = ['pavfinder_transcriptome/scripts/find_sv.py',
                'pavfinder_transcriptome/scripts/map_splice.py',
                'pavfinder_transcriptome/scripts/tap.py',
+               'pavfinder_transcriptome/scripts/extract_transcript_sequence.py',
+               'pavfinder_transcriptome/scripts/rescue_fusion.py',
                ],
 )
