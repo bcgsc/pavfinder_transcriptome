@@ -1,0 +1,165 @@
+
+2016-08-10 __main__
+ 13:36:57 - 
+ 13:36:57 - ________________________________________
+ 13:36:57 - Tasks which will be run:
+ 13:36:57 - 
+ 13:36:57 - 
+ 13:36:57 - Task enters queue = "mkdir('/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/bbt_3.0.0b')   before classify " 
+ 13:36:57 -     Make missing directories [/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/bbt_3.0.0b]
+ 13:36:57 -     Make directories [.../sample_tap/bbt_3.0.0b]
+ 13:36:57 - Task enters queue = "mkdir('/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/pvt_0.3.0')   before find_sv " 
+ 13:36:57 -     Make missing directories [/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/pvt_0.3.0]
+ 13:36:57 -     Make directories [.../sample_tap/pvt_0.3.0]
+ 13:36:57 - Task enters queue = "mkdir('/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/pvt_0.3.0')   before map_splicing " 
+ 13:36:57 -     Make missing directories [/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/pvt_0.3.0]
+ 13:36:57 -     Make directories [.../sample_tap/pvt_0.3.0]
+ 13:36:57 -     Make directories [.../sample_tap/bbt_3.0.0b] completed
+ 13:36:57 - Completed Task = "mkdir('/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/bbt_3.0.0b')   before classify " 
+ 13:36:57 - Task enters queue = 'classify' 
+ 13:36:57 -     Classifies reads by gene
+ 13:36:57 -     Job  = [[[.../test/sample_1.fastq.gz], [.../test/sample_2.fastq.gz]] -> .../bbt_3.0.0b/sample_reads.fq, .../bbt_3.0.0b/sample, ../BTL-690/cancer_census.bf, 32]
+ 13:36:57 -     Make directories [.../sample_tap/pvt_0.3.0] completed
+ 13:36:57 - Completed Task = "mkdir('/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/pvt_0.3.0')   before find_sv " 
+ 13:36:57 -     Make directories [.../sample_tap/pvt_0.3.0] completed
+ 13:36:57 - Completed Task = "mkdir('/home/rchiu/work/git/pavfinder_transcriptome/pavfinder_transcriptome/test/sample_tap/pvt_0.3.0')   before map_splicing " 
+ 13:37:00 -     Job  = [[[.../test/sample_1.fastq.gz], [.../test/sample_2.fastq.gz]] -> .../bbt_3.0.0b/sample_reads.fq, .../bbt_3.0.0b/sample, ../BTL-690/cancer_census.bf, 32] completed
+ 13:37:00 - Completed Task = 'classify' 
+ 13:37:00 - Task enters queue = 'split_input' 
+ 13:37:00 -     Divides single BBT fastq into single files for each gene
+ 13:37:00 -     Job  = [[.../bbt_3.0.0b/sample_reads.fq] -> .../bbt_3.0.0b/*.fastq*]
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/sample_reads.fq] -> .../bbt_3.0.0b/*.fastq*] completed
+ 13:37:02 - Completed Task = 'split_input' 
+ 13:37:02 - Task enters queue = 'pair_reads' 
+ 13:37:02 -     Prepares input files for each single-gene assembly
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/FLT3_1.fastq, .../bbt_3.0.0b/FLT3_2.fastq] -> .../FLT3/FLT3.in]
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/KMT2A_1.fastq, .../bbt_3.0.0b/KMT2A_2.fastq] -> .../KMT2A/KMT2A.in]
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/NPM1_1.fastq, .../bbt_3.0.0b/NPM1_2.fastq] -> .../NPM1/NPM1.in]
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/NSD1_1.fastq, .../bbt_3.0.0b/NSD1_2.fastq] -> .../NSD1/NSD1.in]
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/NUP98_1.fastq, .../bbt_3.0.0b/NUP98_2.fastq] -> .../NUP98/NUP98.in]
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/FLT3_1.fastq, .../bbt_3.0.0b/FLT3_2.fastq] -> .../FLT3/FLT3.in] completed
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/KMT2A_1.fastq, .../bbt_3.0.0b/KMT2A_2.fastq] -> .../KMT2A/KMT2A.in] completed
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/NPM1_1.fastq, .../bbt_3.0.0b/NPM1_2.fastq] -> .../NPM1/NPM1.in] completed
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/NSD1_1.fastq, .../bbt_3.0.0b/NSD1_2.fastq] -> .../NSD1/NSD1.in] completed
+ 13:37:02 -     Job  = [[.../bbt_3.0.0b/NUP98_1.fastq, .../bbt_3.0.0b/NUP98_2.fastq] -> .../NUP98/NUP98.in] completed
+ 13:37:02 - Completed Task = 'pair_reads' 
+ 13:37:02 - Task enters queue = 'symlink_assembly_input' 
+ 13:37:02 -     Symlinks input file for each individual k assembly
+ 13:37:02 -     Job  = [.../FLT3/FLT3.in -> [.../FLT3/k32, .../FLT3/k62, .../FLT3/k92], [32, 62, 92]]
+ 13:37:02 -     Job  = [.../KMT2A/KMT2A.in -> [.../KMT2A/k32, .../KMT2A/k62, .../KMT2A/k92], [32, 62, 92]]
+ 13:37:02 -     Job  = [.../NPM1/NPM1.in -> [.../NPM1/k32, .../NPM1/k62, .../NPM1/k92], [32, 62, 92]]
+ 13:37:02 -     Job  = [.../NSD1/NSD1.in -> [.../NSD1/k32, .../NSD1/k62, .../NSD1/k92], [32, 62, 92]]
+ 13:37:02 -     Job  = [.../NUP98/NUP98.in -> [.../NUP98/k32, .../NUP98/k62, .../NUP98/k92], [32, 62, 92]]
+ 13:37:02 -     Job  = [.../FLT3/FLT3.in -> [.../FLT3/k32, .../FLT3/k62, .../FLT3/k92], [32, 62, 92]] completed
+ 13:37:02 -     Job  = [.../KMT2A/KMT2A.in -> [.../KMT2A/k32, .../KMT2A/k62, .../KMT2A/k92], [32, 62, 92]] completed
+ 13:37:02 -     Job  = [.../NSD1/NSD1.in -> [.../NSD1/k32, .../NSD1/k62, .../NSD1/k92], [32, 62, 92]] completed
+ 13:37:03 -     Job  = [.../NPM1/NPM1.in -> [.../NPM1/k32, .../NPM1/k62, .../NPM1/k92], [32, 62, 92]] completed
+ 13:37:03 -     Job  = [.../NUP98/NUP98.in -> [.../NUP98/k32, .../NUP98/k62, .../NUP98/k92], [32, 62, 92]] completed
+ 13:37:03 - Completed Task = 'symlink_assembly_input' 
+ 13:37:03 - Task enters queue = 'assemble_single_gene' 
+ 13:37:03 -     Assemblies each gene
+ 13:37:03 -     Job  = [.../FLT3/k32 -> .../k32/FLT3-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../FLT3/k62 -> .../k62/FLT3-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../FLT3/k92 -> .../k92/FLT3-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../KMT2A/k32 -> .../k32/KMT2A-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../KMT2A/k62 -> .../k62/KMT2A-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../KMT2A/k92 -> .../k92/KMT2A-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NPM1/k32 -> .../k32/NPM1-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NPM1/k62 -> .../k62/NPM1-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NPM1/k92 -> .../k92/NPM1-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NSD1/k32 -> .../k32/NSD1-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NSD1/k62 -> .../k62/NSD1-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NSD1/k92 -> .../k92/NSD1-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NUP98/k32 -> .../k32/NUP98-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NUP98/k62 -> .../k62/NUP98-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:03 -     Job  = [.../NUP98/k92 -> .../k92/NUP98-final.fa, False, <LoggingProxy>, <thread.lock>]
+ 13:37:09 -     Job  = [.../NUP98/k92 -> .../k92/NUP98-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:10 -     Job  = [.../NSD1/k92 -> .../k92/NSD1-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:10 -     Job  = [.../NSD1/k62 -> .../k62/NSD1-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:10 -     Job  = [.../FLT3/k92 -> .../k92/FLT3-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:11 -     Job  = [.../KMT2A/k62 -> .../k62/KMT2A-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:11 -     Job  = [.../NSD1/k32 -> .../k32/NSD1-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:11 -     Job  = [.../KMT2A/k92 -> .../k92/KMT2A-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:13 -     Job  = [.../NUP98/k62 -> .../k62/NUP98-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:15 -     Job  = [.../KMT2A/k32 -> .../k32/KMT2A-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:20 -     Job  = [.../NUP98/k32 -> .../k32/NUP98-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:24 -     Job  = [.../NPM1/k92 -> .../k92/NPM1-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:24 -     Job  = [.../FLT3/k62 -> .../k62/FLT3-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:27 -     Job  = [.../FLT3/k32 -> .../k32/FLT3-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:34 -     Job  = [.../NPM1/k62 -> .../k62/NPM1-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:40 -     Job  = [.../NPM1/k32 -> .../k32/NPM1-final.fa, False, <LoggingProxy>, <thread.lock>] completed
+ 13:37:40 - Completed Task = 'assemble_single_gene' 
+ 13:37:40 - Task enters queue = 'merge_assemblies' 
+ 13:37:40 -     Merge k assemblies of each gene into a single assembly
+ 13:37:40 -     Job  = [[.../k32/FLT3-final.fa, .../k62/FLT3-final.fa, .../k92/FLT3-final.fa] -> .../FLT3/FLT3-merged.fa, 100]
+ 13:37:40 -     Job  = [[.../k32/KMT2A-final.fa, .../k62/KMT2A-final.fa, .../k92/KMT2A-final.fa] -> .../KMT2A/KMT2A-merged.fa, 100]
+ 13:37:40 -     Job  = [[.../k32/NPM1-final.fa, .../k62/NPM1-final.fa, .../k92/NPM1-final.fa] -> .../NPM1/NPM1-merged.fa, 100]
+ 13:37:40 -     Job  = [[.../k32/NSD1-final.fa, .../k62/NSD1-final.fa, .../k92/NSD1-final.fa] -> .../NSD1/NSD1-merged.fa, 100]
+ 13:37:40 -     Job  = [[.../k32/NUP98-final.fa, .../k62/NUP98-final.fa, .../k92/NUP98-final.fa] -> .../NUP98/NUP98-merged.fa, 100]
+ 13:37:45 -     Job  = [[.../k32/NSD1-final.fa, .../k62/NSD1-final.fa, .../k92/NSD1-final.fa] -> .../NSD1/NSD1-merged.fa, 100] completed
+ 13:37:46 -     Job  = [[.../k32/KMT2A-final.fa, .../k62/KMT2A-final.fa, .../k92/KMT2A-final.fa] -> .../KMT2A/KMT2A-merged.fa, 100] completed
+ 13:37:47 -     Job  = [[.../k32/NUP98-final.fa, .../k62/NUP98-final.fa, .../k92/NUP98-final.fa] -> .../NUP98/NUP98-merged.fa, 100] completed
+ 13:37:50 -     Job  = [[.../k32/FLT3-final.fa, .../k62/FLT3-final.fa, .../k92/FLT3-final.fa] -> .../FLT3/FLT3-merged.fa, 100] completed
+ 13:37:51 -     Job  = [[.../k32/NPM1-final.fa, .../k62/NPM1-final.fa, .../k92/NPM1-final.fa] -> .../NPM1/NPM1-merged.fa, 100] completed
+ 13:37:51 - Completed Task = 'merge_assemblies' 
+ 13:37:51 - Task enters queue = 'concat_fasta' 
+ 13:37:51 -     Concatenates every gene assembly into single fasta file
+ 13:37:51 -     Job  = [[.../FLT3/FLT3-merged.fa, .../KMT2A/KMT2A-merged.fa, .../NPM1/NPM1-merged.fa, .../NSD1/NSD1-merged.fa, .../NUP98/NUP98-merged.fa] -> .../transabyss_1.5.4/sample.fa]
+ 13:37:51 - Task enters queue = 'r2c_bwa_index' 
+ 13:37:51 -     BWA index each gene FASTA for r2c
+ 13:37:51 -     Job  = [.../FLT3/FLT3-merged.fa -> .../FLT3/FLT3-merged.fa.bwt]
+ 13:37:51 -     Job  = [.../KMT2A/KMT2A-merged.fa -> .../KMT2A/KMT2A-merged.fa.bwt]
+ 13:37:51 -     Job  = [.../NPM1/NPM1-merged.fa -> .../NPM1/NPM1-merged.fa.bwt]
+ 13:37:51 -     Job  = [.../NSD1/NSD1-merged.fa -> .../NSD1/NSD1-merged.fa.bwt]
+ 13:37:51 -     Job  = [.../NUP98/NUP98-merged.fa -> .../NUP98/NUP98-merged.fa.bwt]
+ 13:37:51 -     Job  = [[.../FLT3/FLT3-merged.fa, .../KMT2A/KMT2A-merged.fa, .../NPM1/NPM1-merged.fa, .../NSD1/NSD1-merged.fa, .../NUP98/NUP98-merged.fa] -> .../transabyss_1.5.4/sample.fa] completed
+ 13:37:51 - Completed Task = 'concat_fasta' 
+ 13:37:51 - Task enters queue = 'c2g' 
+ 13:37:51 -     Aligns contigs to genome using GMAP
+ 13:37:51 -     Job  = [.../transabyss_1.5.4/sample.fa -> .../transabyss_1.5.4/c2g.bam, None, 32]
+ 13:37:51 - Task enters queue = 'c2t' 
+ 13:37:51 -     Aligns contigs to transcripts using BWA mem
+ 13:37:51 -     Job  = [.../transabyss_1.5.4/sample.fa -> .../transabyss_1.5.4/c2t.bam, 32]
+ 13:37:51 -     Job  = [.../FLT3/FLT3-merged.fa -> .../FLT3/FLT3-merged.fa.bwt] completed
+ 13:37:51 -     Job  = [.../NPM1/NPM1-merged.fa -> .../NPM1/NPM1-merged.fa.bwt] completed
+ 13:37:51 -     Job  = [.../NUP98/NUP98-merged.fa -> .../NUP98/NUP98-merged.fa.bwt] completed
+ 13:37:51 -     Job  = [.../NSD1/NSD1-merged.fa -> .../NSD1/NSD1-merged.fa.bwt] completed
+ 13:37:51 -     Job  = [.../KMT2A/KMT2A-merged.fa -> .../KMT2A/KMT2A-merged.fa.bwt] completed
+ 13:37:51 - Completed Task = 'r2c_bwa_index' 
+ 13:37:51 - Task enters queue = 'r2c' 
+ 13:37:51 -     Aligns reads to assembly for each gene
+ 13:37:51 -     Job  = [.../FLT3/FLT3-merged.fa.bwt -> .../FLT3/r2c.bam, 32]
+ 13:37:51 -     Job  = [.../KMT2A/KMT2A-merged.fa.bwt -> .../KMT2A/r2c.bam, 32]
+ 13:37:51 -     Job  = [.../NPM1/NPM1-merged.fa.bwt -> .../NPM1/r2c.bam, 32]
+ 13:37:51 -     Job  = [.../NSD1/NSD1-merged.fa.bwt -> .../NSD1/r2c.bam, 32]
+ 13:37:51 -     Job  = [.../NUP98/NUP98-merged.fa.bwt -> .../NUP98/r2c.bam, 32]
+ 13:37:52 -     Job  = [.../transabyss_1.5.4/sample.fa -> .../transabyss_1.5.4/c2t.bam, 32] completed
+ 13:37:52 - Completed Task = 'c2t' 
+ 13:37:52 -     Job  = [.../NUP98/NUP98-merged.fa.bwt -> .../NUP98/r2c.bam, 32] completed
+ 13:37:52 -     Job  = [.../NSD1/NSD1-merged.fa.bwt -> .../NSD1/r2c.bam, 32] completed
+ 13:37:52 -     Job  = [.../KMT2A/KMT2A-merged.fa.bwt -> .../KMT2A/r2c.bam, 32] completed
+ 13:37:53 -     Job  = [.../FLT3/FLT3-merged.fa.bwt -> .../FLT3/r2c.bam, 32] completed
+ 13:37:54 -     Job  = [.../transabyss_1.5.4/sample.fa -> .../transabyss_1.5.4/c2g.bam, None, 32] completed
+ 13:37:54 - Completed Task = 'c2g' 
+ 13:37:55 -     Job  = [.../NPM1/NPM1-merged.fa.bwt -> .../NPM1/r2c.bam, 32] completed
+ 13:37:55 - Completed Task = 'r2c' 
+ 13:37:55 - Task enters queue = 'r2c_concat' 
+ 13:37:55 -     Concatenates all r2c bam files into single file
+ 13:37:55 -     Job  = [[.../FLT3/r2c.bam, .../KMT2A/r2c.bam, .../NPM1/r2c.bam, .../NSD1/r2c.bam, .../NUP98/r2c.bam] -> .../transabyss_1.5.4/r2c.bam]
+ 13:38:01 -     Job  = [[.../FLT3/r2c.bam, .../KMT2A/r2c.bam, .../NPM1/r2c.bam, .../NSD1/r2c.bam, .../NUP98/r2c.bam] -> .../transabyss_1.5.4/r2c.bam] completed
+ 13:38:01 - Completed Task = 'r2c_concat' 
+ 13:38:01 - Task enters queue = 'r2c_index_concat' 
+ 13:38:01 -     Samtools index sorted r2c bam
+ 13:38:01 -     Job  = [.../transabyss_1.5.4/r2c.bam -> .../transabyss_1.5.4/r2c.bam.bai]
+ 13:38:01 -     Job  = [.../transabyss_1.5.4/r2c.bam -> .../transabyss_1.5.4/r2c.bam.bai] completed
+ 13:38:02 - Completed Task = 'r2c_index_concat' 
+ 13:38:02 - Task enters queue = 'find_sv' 
+ 13:38:02 -     Finds structural variants using PAVFinder_transcriptome
+ 13:38:02 -     Job  = [[.../transabyss_1.5.4/sample.fa, .../transabyss_1.5.4/c2g.bam, .../transabyss_1.5.4/c2t.bam, .../transabyss_1.5.4/r2c.bam.bai] -> .../pvt_0.3.0/sv.bedpe]
+ 13:38:02 - Task enters queue = 'map_splicing' 
+ 13:38:02 -     Finds splice_variants, generates coverage and junctions files using PAVFinder_transcriptome
+ 13:38:02 -     Job  = [[.../transabyss_1.5.4/sample.fa, .../transabyss_1.5.4/c2g.bam, .../transabyss_1.5.4/r2c.bam.bai] -> [.../pvt_0.3.0/novel_splicing.bedpe, .../pvt_0.3.0/mappings.tsv, .../pvt_0.3.0/junctions.bed], None, None, 32, None]
+ 13:38:23 -     Job  = [[.../transabyss_1.5.4/sample.fa, .../transabyss_1.5.4/c2g.bam, .../transabyss_1.5.4/c2t.bam, .../transabyss_1.5.4/r2c.bam.bai] -> .../pvt_0.3.0/sv.bedpe] completed
+ 13:38:23 - Completed Task = 'find_sv' 
+ 13:39:00 -     Job  = [[.../transabyss_1.5.4/sample.fa, .../transabyss_1.5.4/c2g.bam, .../transabyss_1.5.4/r2c.bam.bai] -> [.../pvt_0.3.0/novel_splicing.bedpe, .../pvt_0.3.0/mappings.tsv, .../pvt_0.3.0/junctions.bed], None, None, 32, None] completed
+ 13:39:00 - Completed Task = 'map_splicing' 
