@@ -11,7 +11,7 @@ from collections import defaultdict
 events_flanking = ('fusion', 'read_through')
 
 def find_support(events, bam_file, query_fasta_file,
-                 min_overlap=4, multi_mapped=False, perfect=True, get_seq=False, 
+                 min_overlap=4, multi_mapped=False, perfect=False, get_seq=False,
                  num_procs=1, debug=False):
     def extract_support_spans(event):
 	seq_ids = []
@@ -124,8 +124,7 @@ def find_spanning(reads, breaks, contig_seq, overlap_buffer=1, debug=False, perf
 	if read.alen:
 	    if read.pos < breaks[0] - overlap_buffer and\
 	       read.pos + read.alen >= breaks[1] + overlap_buffer and\
-	       is_fully_mapped(read, contig_len, perfect=perfect) and\
-	       is_break_region_perfect(read, break_seq, breaks, overlap_buffer):
+	       is_fully_mapped(read, contig_len, perfect=perfect):
 		strand = '+' if not read.is_reverse else '-'
 
 		start_pos = read.pos
