@@ -224,6 +224,7 @@ class SVFinder:
 	    events = []
 	    query_seq = query_fasta.fetch(query)
 	    genes = Set()
+	    tids = []
 
 	    aligns = []
 	    for aln in list(group):
@@ -248,25 +249,40 @@ class SVFinder:
 	    if len(aligns) == 1:
 		partially_aligned = aligns[0].is_partial(query_seq)
 	    
+	    aligns_mapped = 0
 	    block_matches = None
-	    if target_type == 'genome' and len(aligns) == 1:
-		block_matches = self.exon_mapper.map_align(aligns[0])
+	    if target_type == 'genome':
+		if len(aligns) == 1:
+		    block_matches = self.exon_mapper.map_align(aligns[0])
 		
-		# cannot map alignment to gene, skip
-		if not block_matches:
-		    print '%s:cannot map to transcript' % aligns[0].query
-		    continue		
-						
-		tids, genes = get_mapping_genes(block_matches, aligns[0])
-		if len(genes) > 1:
-		    adj = self.is_read_through_from_single_align(block_matches, aligns[0])
-		    if adj is not None:
-			self.update_adj(adj, (aligns[0],aligns[0]), query_seq, target_type, block_matches=block_matches)
-			if filter_adj(adj):
-			    events.append(adj)
-		elif len(tids) == 1 and not partially_aligned and self.exon_mapper.is_full_match(block_matches[list(tids)[0]]):
-		    mappings_by_query[query] = genes, 'full'
-		    continue
+		    # cannot map alignment to gene, skip
+		    if not block_matches:
+			print '%s:cannot map to transcript' % aligns[0].query
+			continue
+
+		    tids, genes = get_mapping_genes(block_matches, aligns[0])
+		    if tids and genes:
+			aligns_mapped = 1
+		    if len(genes) > 1:
+			adj = self.is_read_through_from_single_align(block_matches, aligns[0])
+			if adj is not None:
+			    self.update_adj(adj, (aligns[0],aligns[0]), query_seq, target_type, block_matches=block_matches)
+			    if filter_adj(adj):
+				events.append(adj)
+		    elif len(tids) == 1 and not partially_aligned and self.exon_mapper.is_full_match(block_matches[list(tids)[0]]):
+			mappings_by_query[query] = genes, 'full'
+			continue
+
+		else:
+		    for align in aligns:
+			block_matches = self.exon_mapper.map_align(align)
+			if block_matches:
+			    tids_align, genes_align = get_mapping_genes(block_matches, align)
+			    if len(genes_align) >= 1:
+				aligns_mapped += 1
+			    genes = genes.union(genes_align)
+			# reset block matches for process_split_aligns()
+			block_matches = None
 
 	    if partially_aligned:
 		if external_mappings is None or\
@@ -306,10 +322,11 @@ class SVFinder:
 	    if events:
 		events_by_query[query] = events
 		    
-	    if not partially_aligned:
-		mappings_by_query[query] = genes, 'full'
-	    else:
-		mappings_by_query[query] = genes, 'partial'
+	    if genes:
+		if not partially_aligned and aligns_mapped == len(aligns):
+		    mappings_by_query[query] = genes, 'full'
+		else:
+		    mappings_by_query[query] = genes, 'partial'
 		
 	if partial_aligns:
 	    new_aligns = self.map_partial_aligns(partial_aligns, query_fasta, target_type)
