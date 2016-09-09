@@ -694,7 +694,7 @@ class Adjacency:
 	else:
 	    self.probe = up_seq[-1 * min(len(up_seq), len_on_each_side)::] + mid_seq + down_seq[:min(len_on_each_side, len(down_seq))]
 	
-    def get_subseqs(self, query_seq, len_on_each_side=50, seq_breaks=None):
+    def get_subseqs(self, query_seq, len_on_each_side=None, seq_breaks=None):
 	if not seq_breaks:
 	    if type(self.seq_breaks) is tuple:
 		breaks = map(int, sorted(list(self.seq_breaks)))
@@ -702,8 +702,12 @@ class Adjacency:
 	    breaks = map(int, sorted(list(seq_breaks)))
 	subseqs = []
 	if breaks:
-	    subseqs.append(query_seq[max(0, breaks[0] - len_on_each_side) : breaks[0]])
-	    subseqs.append(query_seq[breaks[1] - 1 : min(len(query_seq), breaks[1] + len_on_each_side - 1)])
+	    if len_on_each_side is None:
+		subseqs.append(query_seq[:breaks[0]])
+		subseqs.append(query_seq[breaks[1] - 1:])
+	    else:
+		subseqs.append(query_seq[max(0, breaks[0] - len_on_each_side) : breaks[0]])
+		subseqs.append(query_seq[breaks[1] - 1 : min(len(query_seq), breaks[1] + len_on_each_side - 1)])
 
 	return subseqs
 	
