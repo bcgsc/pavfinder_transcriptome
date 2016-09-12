@@ -4,7 +4,7 @@ from alignment import reverse_complement, compare_chr
 from adjacency import Adjacency
 
 def find_chimera(aligns, query_seq=None, max_splits=3, debug=False):
-    path = find_paths(aligns, min_coverage=0.01, debug=debug)
+    path = find_paths(aligns, min_coverage=0.01, from_edge=0.8, debug=debug)
     adjs = []
     if path:
 	chimeric_aligns = [aligns[idx] for idx in path]
@@ -376,6 +376,8 @@ def find_paths(aligns, min_coverage=None, use_end_to_end=True, get_all=False, ma
     # screen
     path_info = {}
     for i in range(len(paths)):
+	if len(paths[i]) == 1:
+	    continue
 	covered, overlaps = _coverage(paths[i])
 	if _screen(covered, overlaps):
 	    chroms = Set([aligns[j].target for j in paths[i]])
