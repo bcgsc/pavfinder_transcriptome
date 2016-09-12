@@ -150,8 +150,10 @@ def parse_args():
     filtering.add_argument("--include_noncoding_fusion", action="store_true", help="include noncoding fusions")
     filtering.add_argument("--max_homol_len", type=int, help="maximum homology sequence length. Default:5", default=5)
     filtering.add_argument("--max_novel_len", type=int, help="maximum novel sequence length. Default:20", default=20)
-    filtering.add_argument("--subseq_len", type=int, help="subsequence length for filtering. Default:50", default=50)
-    filtering.add_argument("--probe_len", type=int, help="probe sequence length for filtering. Default:100", default=100)
+    filtering.add_argument("--subseq_len", type=int, help="subsequence length for filtering. Default:200", default=200)
+    filtering.add_argument("--probe_len", type=int, help="probe sequence length for filtering. Default:200", default=200)
+    filtering.add_argument("--disable_subseq_filtering", action="store_true", help="disable subseq filtering")
+    filtering.add_argument("--disable_probe_filtering", action="store_true", help="disable probe filtering")
 
     args = parser.parse_args()
     return args
@@ -226,9 +228,11 @@ def main():
     
     # filter by checking probe and subseq alignments
     if events_merged and args.genome_index and len(args.genome_index) == 2:
-        sf.filter_probes(events_merged, args.genome_index[0], args.genome_index[1], args.outdir, debug=args.debug)
-        sf.filter_subseqs(events_merged, query_fasta, args.genome_index[0], args.genome_index[1], args.outdir,
-                          subseq_len=args.subseq_len, debug=args.debug)
+        if not args.disable_subseq_filtering:
+            sf.filter_subseqs(events_merged, query_fasta, args.genome_index[0], args.genome_index[1], args.outdir,
+                              subseq_len=args.subseq_len, debug=args.debug)
+        if not args.disable_probe_filtering:
+            sf.filter_probes(events_merged, args.genome_index[0], args.genome_index[1], args.outdir, args.probe_len, debug=args.debug)
 
     # read support
     if args.r2c:
