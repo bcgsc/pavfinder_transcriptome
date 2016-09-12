@@ -232,9 +232,10 @@ class SVFinder:
 		    align = Alignment.from_alignedRead(aln, bam)
 		    # skip align if it's invalid (e.g. begin with softclip) or 
 		    # query sequence is potentially homopolymer
-		    if align.is_valid() and\
-		       align.aligned_seq(query_seq) and\
-		       not self.is_homopolymer_fragment(align.aligned_seq(query_seq)):
+		    if align.is_valid():
+		    #if align.is_valid() and\
+		       #align.aligned_seq(query_seq) and\
+		       #not self.is_homopolymer_fragment(align.aligned_seq(query_seq)):
 			if target_type == 'genome':
 			    if align.has_canonical_target():
 				aligns.append(align)
@@ -293,7 +294,9 @@ class SVFinder:
     
 	    # chimera
 	    if len(aligns) > 1:
-		events.extend(process_split_aligns(aligns, query_seq, genes))
+		aligns_sorted = sorted(aligns, key=lambda a: int(a.qstart))
+		for align1, align2 in zip(aligns_sorted, aligns_sorted[1:]):
+		    events.extend(process_split_aligns([align1, align2], query_seq, genes))
 		        
 	    # indels
 	    for align in aligns:
@@ -340,7 +343,7 @@ class SVFinder:
 	return events_by_query, mappings_by_query
     
     @classmethod
-    def filter_probes(cls, events, genome_index_dir, genome_index, working_dir, debug=False):
+    def filter_probes(cls, events, genome_index_dir, genome_index, working_dir, probe_length, debug=False):
 	def create_query_fasta(events, fa_file, min_size=0):
 	    qname_to_event = {}
 	    fa = open(fa_file, 'w')
@@ -373,11 +376,6 @@ class SVFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/probes.bam' % working_dir
 	    
-	    #cmd = 'bwa mem %s/%s %s -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                   #genome_index,
-	                                                                   #probes_fa,
-	                                                                   #nthreads,
-	                                                                   #aln_bam_file)
 	    cmd = 'gmap -D %s -d %s %s -n0 -f samse -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
 	                                                                                   genome_index,
 	                                                                                   probes_fa,
@@ -420,8 +418,6 @@ class SVFinder:
 				mappings[transcript.id].append(i)
 		    if not mappings:
 			return 'fusion subseq not mapped to either of the 2 genes'
-		    if len(mappings.keys()) < len(event.transcripts):
-			return 'fusion subseq mapped to only a single gene'
 		return False
 
 	    def has_same_indel(aln, event_type, size):
@@ -471,33 +467,13 @@ class SVFinder:
 			    failed_reason = '%s %s probe align indel not matched %s' % (event_type, size, aln.cigarstring)
 			    bad = True
 
-		elif 'repeat' not in event_type:
-		    if event_type == 'fusion' and not aln.is_unmapped and aln.cigartuples[0][0] == 0 and aln.cigartuples[-1][0] == 0:
-			failed_reason = 'probe align from end to end %s' % aln.cigarstring
-			bad = True
-
-		    elif event_type == 'fusion':
-			if not bad:
-			    window = 20
-			    chroms = list(itemgetter(1,4)(key.split('-')))
-			    break_pos = list(map(int, itemgetter(2,5)(key.split('-'))))
-			    matched = []
-			    for aln in alns:
-				target = bam.getrname(aln.tid)
-				for i in range(len(chroms)):
-				    if target == chroms[i] and\
-				       break_pos[i] >= aln.reference_start - window and\
-				       break_pos[i] <= aln.reference_end + window:
-					del chroms[i]
-					del break_pos[i]
-					break
-			    # only require one of the 2 breakpoint positions to be mapped by probe
-			    if len(chroms) > 1:
-				unmatched_pos = []
-				for i in range(len(chroms)):
-				    unmatched_pos.append('%s:%s' % (chroms[i], break_pos[i]))
-				failed_reason = 'breakpoint pos not covered by probe - %s' % ','.join(unmatched_pos)
-				bad = True
+		elif 'repeat' not in event_type: 
+		    if event_type == 'fusion':
+			if int(aln.get_tag('NM')) <= 2 and float(aln.query_alignment_length)/probe_length > 0.9:
+			    failed_reason = 'probe aligned exclusively %d/%d=%.02f' % (aln.query_alignment_length,
+			                                                               probe_length,
+			                                                               float(aln.query_alignment_length)/probe_length)
+			    bad = True
 
 		    if not bad:
 			if event_type in ('fusion', 'read_through'):
@@ -525,7 +501,7 @@ class SVFinder:
 		    os.remove(ff)
 
     @classmethod
-    def filter_subseqs(cls, events, query_fa, genome_index_dir, genome_index, working_dir, subseq_len=50, debug=False):
+    def filter_subseqs(cls, events, query_fa, genome_index_dir, genome_index, working_dir, subseq_len=None, debug=False):
 	def create_query_fasta(events, fa_file, min_size=20):
 	    count = 0
 	    fa = open(fa_file, 'w')
@@ -551,11 +527,6 @@ class SVFinder:
 	def run_align(probes_fa, nthreads=12):
 	    aln_bam_file = '%s/subseqs.bam' % working_dir
 	    
-	    #cmd = 'bwa mem %s/%s %s -a -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
-	                                                                      #genome_index,
-	                                                                      #probes_fa,
-	                                                                      #nthreads,
-	                                                                      #aln_bam_file)
 	    cmd = 'gmap -D %s -d %s %s -f samse -t %d | samtools view -bhS - -o %s' % (genome_index_dir,
 	                                                                               genome_index,
 	                                                                               probes_fa,
@@ -577,9 +548,9 @@ class SVFinder:
 		return None
 	    
 	def is_mapped(aln, min_aligned):
-	    if not aln.is_unmapped:
+	    if not aln.is_unmapped and int(aln.get_tag('NM')) == 0:
 		mapped_size = sum([t[1] for t in aln.cigartuples if t[0] == 0])
-		if float(mapped_size)/subseq_len >= min_aligned:
+		if float(mapped_size)/aln.infer_query_length() >= min_aligned:
 		    return True
 		else:
 		    return False
@@ -610,7 +581,7 @@ class SVFinder:
 
 		alns = list(group)
 		
-		mapped_alns = [aln for aln in alns if is_mapped(aln, 0.8)]
+		mapped_alns = [aln for aln in alns if is_mapped(aln, 1.0)]
 		if mapped_alns:
 		    subseq_align_tallies[query] = 0
 		    matched = []
@@ -651,22 +622,16 @@ class SVFinder:
 			    continue
 
 			# check for multimapping of both subseqs
-			if '%s:%s:0' % (seq_id, events[i].key()) in multimapped and\
+			if '%s:%s:0' % (seq_id, events[i].key()) in multimapped or\
 			   '%s:%s:1' % (seq_id, events[i].key()) in multimapped:
 			    remove.add(i)
-			    print '%s: remove %s - both subseqs multimap' % (seq_id,
-			                                                     events[i].key())
+			    if '%s:%s:0' % (seq_id, events[i].key()) in multimapped:
+				print '%s: remove %s - subseq 0 multimap' % (seq_id,
+				                                             events[i].key())
+			    elif '%s:%s:1' % (seq_id, events[i].key()) in multimapped:
+				print '%s: remove %s - subseq 1 multimap' % (seq_id,
+				                                             events[i].key())
 			    break
-
-			if subseq_mappings[seq_id].has_key(events[i].key()):	    
-			    if subseq_mappings[seq_id][events[i].key()].has_key('0') and\
-			       subseq_mappings[seq_id][events[i].key()].has_key('1') and\
-			       (not subseq_mappings[seq_id][events[i].key()]['0'] or\
-			        not subseq_mappings[seq_id][events[i].key()]['1']):
-				remove.add(i)
-				print '%s: remove %s - subseq fully_mapped to another region' % (seq_id,
-				                                                                 events[i].key())
-				break
 			
 	    for i in sorted(list(remove), reverse=True):
 		del events[i]
