@@ -14,12 +14,13 @@
 
 * genome FASTA and index files
  * For example, hg19:
- 
-         wget ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes/chr*.fa.gz;
-	 zcat chr*.fa.gz > hg19.fa && rm chr*.fa.gz
-	 samtools faidx hg19.fa
-         bwa index hg19.fa
-         gmap_build -D . -d hg19 hg19.fa
+   ```
+   wget ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes/chr*.fa.gz
+   zcat chr*.fa.gz > hg19.fa && rm chr*.fa.gz
+   samtools faidx hg19.fa
+   bwa index hg19.fa
+   gmap_build -D . -d hg19 hg19.fa
+   ```
 
 * transcriptome FASTA and index files
 
