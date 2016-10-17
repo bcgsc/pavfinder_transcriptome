@@ -11,6 +11,7 @@
 
 
 ## External files
+To run PAVFinder, the following reference sequence and annotation files are required:
 
 * genome FASTA and index files
  * For example, to prepare hg19 files from UCSC:
