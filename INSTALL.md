@@ -35,9 +35,7 @@
 *  transcriptome FASTA and index files
  * To create transcriptome FASTA file PAVFinder provides a script for doing it (after Pip virtualenv install it should be present under '/bin/')
 
-   ```python
-   extract_transcript_sequence.py <gtf> <fasta_output> <genome_fasta> --index
-   ```
+   ```extract_transcript_sequence.py <gtf> <fasta_output> <genome_fasta> --index```
 
    A transcript FASTA and a corresponding BWA index will be genearated
 
