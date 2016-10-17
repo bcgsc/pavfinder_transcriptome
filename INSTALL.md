@@ -13,7 +13,7 @@
 ## External files
 
 * genome FASTA and index files
- * For example, hg19:
+ * For example, to prepare hg19 files from UCSC:
  
    ```bash
    wget ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes/chr*.fa.gz
@@ -22,11 +22,24 @@
    bwa index hg19.fa
    gmap_build -D . -d hg19 hg19.fa
    ```
+* annotation VCF and index files
+ * For example, to prepare Refseq genes from UCSC:
 
-* transcriptome FASTA and index files
+   ```bash
+   wget http://hgdownload.cse.ucsc.edu/goldenpath/hg19/database/refGene.txt.gz
+   zcat refGene.txt.gz | cut -f2- | ~rchiu/bin/genePredToGtf file stdin refGene.gtf
+   sort -k1,1 -k4,4n refGene.gtf > refGene.sorted.gtf
+   bgzip refGene.sorted.gtf
+   tabix -p gff refGene.sorted.gtf.gz
 
-* annotation files (.vcf)
+*  transcriptome FASTA and index files
+ * To create transcriptome FASTA file PAVFinder provides a script for doing it (after Pip virtualenv install it should be present under '/bin/')
 
+   ```python
+   extract_transcript_sequence.py <gtf> <fasta_output> <genome_fasta> --index
+   ```
+
+   A transcript FASTA and a corresponding BWA index will be genearated
 
 ## Installing the Python package
 
