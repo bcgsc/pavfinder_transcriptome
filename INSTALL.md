@@ -31,11 +31,14 @@
    sort -k1,1 -k4,4n refGene.gtf > refGene.sorted.gtf
    bgzip refGene.sorted.gtf
    tabix -p gff refGene.sorted.gtf.gz
+   ```
 
 *  transcriptome FASTA and index files
  * To create transcriptome FASTA file PAVFinder provides a script for doing it (after Pip virtualenv install it should be present under '/bin/')
 
-   ```extract_transcript_sequence.py <gtf> <fasta_output> <genome_fasta> --index```
+   ```python
+   extract_transcript_sequence.py <gtf> <fasta_output> <genome_fasta> --index
+   ```
 
    A transcript FASTA and a corresponding BWA index will be genearated
 
