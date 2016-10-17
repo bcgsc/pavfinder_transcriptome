@@ -14,7 +14,8 @@
 
 * genome FASTA and index files
  * For example, hg19:
-   ```
+ 
+   ```bash
    wget ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes/chr*.fa.gz
    zcat chr*.fa.gz > hg19.fa && rm chr*.fa.gz
    samtools faidx hg19.fa
