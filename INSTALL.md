@@ -35,7 +35,7 @@ To run PAVFinder, the following reference sequence and annotation files are requ
    ```
 
 *  transcriptome FASTA and index files
- * To create a reference transcriptome FASTA, PAVFinder provides a utiltiy for it (available under 'bin' for pip virtualenv install)
+ * To create a reference transcriptome FASTA, PAVFinder provides a utility for making it (available under 'bin' for pip virtualenv install)
 
    ```extract_transcript_sequence.py <gtf> <fasta_output> <genome_fasta> --index```
 
