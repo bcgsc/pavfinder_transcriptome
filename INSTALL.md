@@ -5,9 +5,9 @@
 * [BWA-mem](http://bio-bwa.sourceforge.net/) v0.7.12
 * [GMAP](http://research-pub.gene.com/gmap/) 2014-12-28
 * [samtools](http://samtools.sourceforge.net/) v0.1.19
-* [BBT](http://www.bcgsc.ca/platform/bioinfo/software/biobloomtools) v3.0.0 (required) (if TAP is run in targeted mode)
+* [BBT](http://www.bcgsc.ca/platform/bioinfo/software/biobloomtools) v3.0.0b (required) (if TAP is run in targeted mode)
 
-*tested versions indicated, may not be the most recent version.  For BBT, v3.0.0 is required.
+*tested versions indicated, may not be the most recent version.  For BBT, v3.0.0b is required.
 
 
 ## External files
@@ -41,7 +41,17 @@ To run PAVFinder, the following reference sequence and annotation files are requ
 
    A transcript FASTA and a corresponding BWA index will be genearated
 
-## Installing the Python package
+If running TAP, after installation of PVT(below) the full paths of the above reference and annotation files can be specified in /path/to/virtualenv/config/tap.cfg which can be passed to TAP via --params
+
+  ```bash
+  genome_index = /real/path/to/gmapdb hg19
+  transcripts_fasta = /real/path/to/transcripts.fa
+  genome_fasta = /real/path/to/genome.fa
+  gtf = /real/path/to/gtf
+  suppl_annot = /real/path/to/supplementary_gtf (optional)
+  ```
+
+## Installing the Python PVT package
 
 1. ```pip install virtualenv```
 2. ```virtualenv <DIR>```
@@ -49,4 +59,8 @@ To run PAVFinder, the following reference sequence and annotation files are requ
 4. ```pip install -U cython```
 5. ```pip install git+https://github.com/bcgsc/pavfinder_transcriptome.git#egg=pavfinder_transcriptome```
 
-The Python scripts for detecting structural (find\_sv.py) and splice (map\_splice.py) variants, and the TAP pipeline script (tap.py) will be copied to the "bin" directory in the virtualenv directory.
+After successful installation, the following will be made avaiable in different sub-directories under the virtualenv directory:
+
+1. Python scripts for detecting structural (find\_sv.py) and splice (map\_splice.py) variants, and the TAP pipeline script (tap.py) will be in "bin"
+2. A template config file (tap.cfg) for running TAP will be in "config"
+3. Sample data will be in "test"
