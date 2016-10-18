@@ -27,7 +27,7 @@ setup(
         'biopython',
         ],
     package_data = {'pavfinder_transcriptome': ["test/*", "scripts/*.py"]},
-    data_files = [('config', ['pavfinder_transcriptome/cfg/tap.cfg']), ('test', ['pavfinder_transcriptome/test/sample_1.fastq.gz', 'pavfinder_transcriptome/test/sample_2.fastq.gz'])],
+    data_files = [('config', ['pavfinder_transcriptome/cfg/tap.cfg']), ('test', ['pavfinder_transcriptome/test/sample_1.fastq.gz', 'pavfinder_transcriptome/test/sample_2.fastq.gz', 'pavfinder_transcriptome/test/sample_tap_output.tar.gz', 'pavfinder_transcriptome/test/cancer_census.tar.gz', 'pavfinder_transcriptome/test/README'])],
     scripts = ['pavfinder_transcriptome/scripts/find_sv.py',
                'pavfinder_transcriptome/scripts/map_splice.py',
                'pavfinder_transcriptome/scripts/tap.py',
