@@ -28,7 +28,7 @@ See INSTALL for more details
 ## Usage
 1. Run PVT (for structural variants)
 
- ```python
+ ```bash
  find_sv.py --gbam <contigs_to_genome_bam> --tbam <contigs_to_transcripts_bam> --transcripts_fasta <indexed_transcripts_fasta> --genome_index <GMAP index genome directory and name> --r2c <reads_to_contigs_bam> <contigs_fasta> <gtf> <genome_fasta> <outdir>
  ```
 
