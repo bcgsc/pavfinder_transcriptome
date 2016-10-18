@@ -35,13 +35,13 @@ To run PAVFinder, the following reference sequence and annotation files are requ
    ```
 
 *  transcriptome FASTA and index files
- * To create transcriptome FASTA file PAVFinder provides a script for doing it (after Pip virtualenv install it should be present under '/bin/')
+ * To create a reference transcriptome FASTA, PAVFinder provides a utiltiy for it (available under 'bin' for pip virtualenv install)
 
    ```extract_transcript_sequence.py <gtf> <fasta_output> <genome_fasta> --index```
 
    A transcript FASTA and a corresponding BWA index will be genearated
 
-If running TAP, after installation of PVT(below) the full paths of the above reference and annotation files can be specified in /path/to/virtualenv/config/tap.cfg which can be passed to TAP via --params
+If running TAP, after installation of PVT(below) full paths of the above reference and annotation files can be specified in /path/to/virtualenv/config/tap.cfg which can be passed to TAP via --params
 
   ```bash
   genome_index = /real/path/to/gmapdb hg19
@@ -59,7 +59,7 @@ If running TAP, after installation of PVT(below) the full paths of the above ref
 4. ```pip install -U cython```
 5. ```pip install git+https://github.com/bcgsc/pavfinder_transcriptome.git#egg=pavfinder_transcriptome```
 
-After successful installation, the following will be made avaiable in different sub-directories under the virtualenv directory:
+After successful installation, the following will be available in different sub-directories under the virtualenv directory:
 
 1. Python scripts for detecting structural (find\_sv.py) and splice (map\_splice.py) variants, and the TAP pipeline script (tap.py) will be in "bin"
 2. A template config file (tap.cfg) for running TAP will be in "config"
