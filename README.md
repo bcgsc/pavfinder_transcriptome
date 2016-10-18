@@ -10,7 +10,6 @@ With the aid of gene-model annotation(s), diversified classes of variants such a
 The program is usually preceded by de novo assembly of RNAseq sequences followed by alignment to the reference genome.
 As such, a pipeline that bundles the 3 analysis	steps called **TAP** (**T**ransabyss-**A**lignment-**P**AVFinder) is provided as a standalone application.  TAP can also be run in targeted mode on selected genes.  This requires a Bloom Filter of target gene sequences to be created beforehand.  Whereas the full assembly of a RNAseq library with over 100 million read pairs requires more than 24 hours to complete, a target assembly and analysis of a gene list (e.g. COSMIC) of several hundred can be completed within half an hour.
 
----
 ## Requirements
 1. External softwares
 
@@ -26,7 +25,6 @@ As such, a pipeline that bundles the 3 analysis	steps called **TAP** (**T**ransa
 
 See INSTALL for more details
 
----
 ## Usage
 1. Run PVT (for structural variants)
 
