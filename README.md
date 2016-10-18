@@ -3,7 +3,7 @@
 
 Author:	Readman	Chiu (rchiu@bcgsc.ca)
 
-PAVFinder_transcript (**PVT**) is a Python package written to identify structural variants in transcriptome assemblies.
+PAVFinder_transcriptome (**PVT**) is a Python package written to identify structural variants in transcriptome assemblies.
 In a nutshell, the algorithm infers variants from non-contiguous (split or gapped) contig sequence alignments to the reference genome.
 With the aid of gene-model annotation(s), diversified classes of variants such as gene fusions, read-throughs, internal and partial tandem duplications, indels and novel splice variants are classified.
 
