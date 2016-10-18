@@ -10,7 +10,7 @@
   map_splice.py <contigs_to_genome_bam> <contigs_fasta> <gtf> <genome_fasta> <outdir> --r2c <reads_to_contigs_bam> --suppl_annot <supplmental_annotations>
   ```
 
-* Run full (assembly + analysis) TAP in targeted model
+* Run full (assembly + analysis) TAP in targeted mode
 
   ```
   tap.py <sample> <outdir> --bf <target_genes.bf> --fq_list <file_listing_FASTQ_pairs> --k <space-delimited k values> --readlen <read_length>  --nprocs <number_of_processes> --params <parameters_file>
@@ -25,6 +25,6 @@
 * Run TAP for just de novo assembly
 
   ```
-  tap.py <sample> <outdir> --fq_list <file_listing_FASTQ_pairs> --k <space-delimited k values> --readlen <read_length> --nprocs <number_of_processes> --params <parameters_file> --only_assembly
+  tap.py <sample> <outdir> --fq_list <file_listing_FASTQ_pairs> --k <space-delimited k values> --readlen <read_length> --nprocs <number_of_processes> --only_assembly
   ```
   

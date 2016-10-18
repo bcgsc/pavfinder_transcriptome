@@ -16,7 +16,7 @@ To run PAVFinder, the following reference sequence and annotation files are requ
 * genome FASTA and index files
  * For example, to prepare hg19 files from UCSC:
  
-   ```bash
+   ```
    wget ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes/chr*.fa.gz
    zcat chr*.fa.gz > hg19.fa && rm chr*.fa.gz
    samtools faidx hg19.fa
@@ -26,7 +26,7 @@ To run PAVFinder, the following reference sequence and annotation files are requ
 * annotation VCF and index files
  * For example, to prepare Refseq genes from UCSC:
 
-   ```bash
+   ```
    wget http://hgdownload.cse.ucsc.edu/goldenpath/hg19/database/refGene.txt.gz
    zcat refGene.txt.gz | cut -f2- | ~rchiu/bin/genePredToGtf file stdin refGene.gtf
    sort -k1,1 -k4,4n refGene.gtf > refGene.sorted.gtf
@@ -43,7 +43,7 @@ To run PAVFinder, the following reference sequence and annotation files are requ
 
 If running TAP, after installation of PVT(below) full paths of the above reference and annotation files can be specified in /path/to/virtualenv/config/tap.cfg which can be passed to TAP via --params
 
-  ```bash
+  ```
   genome_index = /real/path/to/gmapdb hg19
   transcripts_fasta = /real/path/to/transcripts.fa
   genome_fasta = /real/path/to/genome.fa
